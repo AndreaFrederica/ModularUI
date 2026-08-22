@@ -1,6 +1,11 @@
 package com.cleanroommc.modularui.widgets;
 
 import com.cleanroommc.modularui.api.ITheme;
+import com.cleanroommc.modularui.api.navigation.INavigationActionHandler;
+import com.cleanroommc.modularui.api.navigation.NavigationAction;
+import com.cleanroommc.modularui.api.navigation.NavigationActionResult;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
+import com.cleanroommc.modularui.api.navigation.NavigationRole;
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.widget.Interactable;
 import com.cleanroommc.modularui.drawable.DrawableStack;
@@ -12,7 +17,7 @@ import com.cleanroommc.modularui.widget.Widget;
 
 import org.jetbrains.annotations.NotNull;
 
-public class PageButton extends Widget<PageButton> implements Interactable {
+public class PageButton extends Widget<PageButton> implements Interactable, INavigationActionHandler {
 
     private final int index;
     private final PagedWidget.Controller controller;
@@ -23,6 +28,27 @@ public class PageButton extends Widget<PageButton> implements Interactable {
         this.index = index;
         this.controller = controller;
         disableHoverBackground();
+    }
+
+    @Override
+    protected NavigationInfo getDefaultNavigationInfo() {
+        return NavigationInfo.builder(NavigationRole.TAB)
+                .actions(NavigationAction.ACTIVATE, NavigationAction.PAGE_PREVIOUS,
+                        NavigationAction.PAGE_NEXT)
+                .build();
+    }
+
+    @Override
+    public NavigationActionResult onNavigationAction(NavigationAction action) {
+        if (action == NavigationAction.PAGE_PREVIOUS) {
+            this.controller.previousPage();
+            return NavigationActionResult.CHANGED;
+        }
+        if (action == NavigationAction.PAGE_NEXT) {
+            this.controller.nextPage();
+            return NavigationActionResult.CHANGED;
+        }
+        return NavigationActionResult.IGNORED;
     }
 
     @Override

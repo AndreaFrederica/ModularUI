@@ -6,6 +6,12 @@ import com.cleanroommc.modularui.api.layout.IViewportStack;
 import com.cleanroommc.modularui.api.widget.IGuiAction;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.api.widget.Interactable;
+import com.cleanroommc.modularui.api.navigation.INavigationActionHandler;
+import com.cleanroommc.modularui.api.navigation.NavigationAction;
+import com.cleanroommc.modularui.api.navigation.NavigationActionResult;
+import com.cleanroommc.modularui.api.navigation.NavigationAxis;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
+import com.cleanroommc.modularui.api.navigation.NavigationRole;
 import com.cleanroommc.modularui.drawable.Stencil;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetTheme;
@@ -26,12 +32,44 @@ import org.jetbrains.annotations.Nullable;
  * @param <I> type of children (in most cases just {@link IWidget})
  * @param <W> type of this widget
  */
-public abstract class AbstractScrollWidget<I extends IWidget, W extends AbstractScrollWidget<I, W>> extends AbstractParentWidget<I, W> implements IViewport, Interactable {
+public abstract class AbstractScrollWidget<I extends IWidget, W extends AbstractScrollWidget<I, W>> extends AbstractParentWidget<I, W>
+        implements IViewport, Interactable, INavigationActionHandler {
 
     private final ScrollArea scroll = new ScrollArea();
     private boolean scrollXActive, scrollYActive;
 
     private boolean showScrollShadows = true;
+    private int lastNavigationScrollX;
+    private int lastNavigationScrollY;
+
+    @Override
+    protected NavigationInfo getDefaultNavigationInfo() {
+        NavigationAxis axis = this.scroll.getScrollY() != null ? NavigationAxis.VERTICAL
+                : this.scroll.getScrollX() != null ? NavigationAxis.HORIZONTAL : NavigationAxis.NONE;
+        return NavigationInfo.builder(NavigationRole.SCROLL_VIEW)
+                .actions(NavigationAction.SCROLL_UP, NavigationAction.SCROLL_DOWN)
+                .primaryAxis(axis)
+                .focusable(false)
+                .build();
+    }
+
+    @Override
+    public NavigationActionResult onNavigationAction(NavigationAction action) {
+        if (action != NavigationAction.SCROLL_UP && action != NavigationAction.SCROLL_DOWN) {
+            return NavigationActionResult.IGNORED;
+        }
+        ScrollData data = this.scroll.getScrollY() != null ? this.scroll.getScrollY() : this.scroll.getScrollX();
+        if (data == null) return NavigationActionResult.IGNORED;
+        int before = data.isAnimating() ? data.getAnimatingTo() : data.getScroll();
+        boolean handled = this.scroll.mouseScroll(0, 0,
+                action == NavigationAction.SCROLL_UP ? 1 : -1, false);
+        int after = data.isAnimating() ? data.getAnimatingTo() : data.getScroll();
+        if (before != after) {
+            markNavigationGeometryDirty();
+            return NavigationActionResult.CHANGED;
+        }
+        return handled ? NavigationActionResult.HANDLED : NavigationActionResult.IGNORED;
+    }
 
     public AbstractScrollWidget(@Nullable HorizontalScrollData x, @Nullable VerticalScrollData y) {
         super();
@@ -126,6 +164,13 @@ public abstract class AbstractScrollWidget<I extends IWidget, W extends Abstract
     public void onUpdate() {
         super.onUpdate();
         checkScrollbarActive(true);
+        int x = getScrollX();
+        int y = getScrollY();
+        if (x != this.lastNavigationScrollX || y != this.lastNavigationScrollY) {
+            this.lastNavigationScrollX = x;
+            this.lastNavigationScrollY = y;
+            markNavigationGeometryDirty();
+        }
     }
 
     @Override

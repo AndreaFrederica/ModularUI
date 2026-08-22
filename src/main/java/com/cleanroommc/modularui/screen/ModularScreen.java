@@ -182,6 +182,7 @@ public class ModularScreen {
      */
     @MustBeInvokedByOverriders
     public void onResize(int width, int height) {
+        this.panelManager.markNavigationGeometryDirty();
         this.context.updateScreenArea(width, height);
         if (this.panelManager.tryInit()) {
             onOpen();

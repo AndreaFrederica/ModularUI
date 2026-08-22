@@ -6,6 +6,12 @@ import com.cleanroommc.modularui.api.value.IDoubleValue;
 import com.cleanroommc.modularui.api.value.ISyncOrValue;
 import com.cleanroommc.modularui.api.widget.IGuiAction;
 import com.cleanroommc.modularui.api.widget.Interactable;
+import com.cleanroommc.modularui.api.navigation.INavigationActionHandler;
+import com.cleanroommc.modularui.api.navigation.NavigationAction;
+import com.cleanroommc.modularui.api.navigation.NavigationActionResult;
+import com.cleanroommc.modularui.api.navigation.NavigationAxis;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
+import com.cleanroommc.modularui.api.navigation.NavigationRole;
 import com.cleanroommc.modularui.drawable.GuiTextures;
 import com.cleanroommc.modularui.drawable.Rectangle;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
@@ -22,7 +28,12 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import org.jetbrains.annotations.NotNull;
 
-public class SliderWidget extends Widget<SliderWidget> implements Interactable {
+public class SliderWidget extends Widget<SliderWidget> implements Interactable, INavigationActionHandler {
+
+    private static final NavigationInfo DEFAULT_NAVIGATION = NavigationInfo.builder(NavigationRole.SLIDER)
+            .actions(NavigationAction.INCREMENT, NavigationAction.DECREMENT)
+            .primaryAxis(NavigationAxis.HORIZONTAL)
+            .build();
 
     private IDoubleValue<?> doubleValue;
     private IDrawable stopperDrawable = new Rectangle().color(Color.withAlpha(Color.WHITE.main, 0.4f));
@@ -36,6 +47,23 @@ public class SliderWidget extends Widget<SliderWidget> implements Interactable {
     private boolean dragging = false;
 
     private double cache = Double.MIN_VALUE;
+
+    @Override
+    protected NavigationInfo getDefaultNavigationInfo() {
+        return DEFAULT_NAVIGATION;
+    }
+
+    @Override
+    public NavigationActionResult onNavigationAction(NavigationAction action) {
+        if (action != NavigationAction.INCREMENT && action != NavigationAction.DECREMENT) {
+            return NavigationActionResult.IGNORED;
+        }
+        double step = this.each > 0.0D ? this.each : Math.max((this.max - this.min) / 20.0D, 0.000001D);
+        double before = getSliderValue();
+        setValue(before + (action == NavigationAction.INCREMENT ? step : -step), true);
+        return Double.compare(before, getSliderValue()) == 0
+                ? NavigationActionResult.HANDLED : NavigationActionResult.CHANGED;
+    }
 
     public SliderWidget() {
         sliderHeight(1f).sliderWidth(6);

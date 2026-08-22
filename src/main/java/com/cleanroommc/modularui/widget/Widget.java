@@ -12,6 +12,7 @@ import com.cleanroommc.modularui.api.widget.IPositioned;
 import com.cleanroommc.modularui.api.widget.ISynced;
 import com.cleanroommc.modularui.api.widget.ITooltip;
 import com.cleanroommc.modularui.api.widget.IWidget;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
 import com.cleanroommc.modularui.screen.RichTooltip;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetTheme;
@@ -818,6 +819,12 @@ public class Widget<W extends Widget<W>> extends AbstractWidget implements IPosi
      */
     public W name(String name) {
         setName(name);
+        return getThis();
+    }
+
+    /** Adds device-neutral navigation metadata to this widget. */
+    public W navigationInfo(@Nullable NavigationInfo navigationInfo) {
+        setNavigationInfo(navigationInfo);
         return getThis();
     }
 

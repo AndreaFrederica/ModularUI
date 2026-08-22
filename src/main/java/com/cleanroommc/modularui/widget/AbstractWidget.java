@@ -3,6 +3,11 @@ package com.cleanroommc.modularui.widget;
 import com.cleanroommc.modularui.api.widget.IDelegatingWidget;
 import com.cleanroommc.modularui.api.widget.INotifyEnabled;
 import com.cleanroommc.modularui.api.widget.IWidget;
+import com.cleanroommc.modularui.api.widget.Interactable;
+import com.cleanroommc.modularui.api.navigation.NavigationAction;
+import com.cleanroommc.modularui.api.navigation.INavigationElement;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
+import com.cleanroommc.modularui.api.navigation.NavigationRole;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
@@ -19,7 +24,12 @@ import java.util.Objects;
 /**
  * Very basic implementation of {@link IWidget}.
  */
-public abstract class AbstractWidget implements IWidget {
+public abstract class AbstractWidget implements IWidget, INavigationElement {
+
+    private static final NavigationInfo DEFAULT_INTERACTABLE_NAVIGATION =
+            NavigationInfo.builder(NavigationRole.BUTTON)
+                    .actions(NavigationAction.ACTIVATE, NavigationAction.SECONDARY)
+                    .build();
 
     // gui context
     private boolean valid = false;
@@ -28,6 +38,7 @@ public abstract class AbstractWidget implements IWidget {
     private ModularGuiContext context = null;
 
     @Nullable private String name;
+    @Nullable private NavigationInfo navigationInfo;
     private boolean enabled = true;
     private int timeHovered = -1;
     private int timeBelowMouse = -1;
@@ -49,6 +60,7 @@ public abstract class AbstractWidget implements IWidget {
     @Override
     public void scheduleResize() {
         this.resizer.markDirty();
+        markNavigationGeometryDirty();
     }
 
     @Override
@@ -236,6 +248,7 @@ public abstract class AbstractWidget implements IWidget {
     public void setEnabled(boolean enabled) {
         if (this.enabled != enabled) {
             this.enabled = enabled;
+            markNavigationStructureDirty();
             if (isValid() && getParent() instanceof INotifyEnabled notifyEnabled) {
                 notifyEnabled.onChildChangeEnabled(this, enabled);
             }
@@ -316,7 +329,32 @@ public abstract class AbstractWidget implements IWidget {
     }
 
     protected void setName(String name) {
+        if (Objects.equals(this.name, name)) return;
         this.name = name;
+        markNavigationStructureDirty();
+    }
+
+    @Override
+    public NavigationInfo getNavigationInfo() {
+        return this.navigationInfo == null ? getDefaultNavigationInfo() : this.navigationInfo;
+    }
+
+    protected NavigationInfo getDefaultNavigationInfo() {
+        return this instanceof Interactable ? DEFAULT_INTERACTABLE_NAVIGATION : NavigationInfo.NONE;
+    }
+
+    protected final void setNavigationInfo(@Nullable NavigationInfo navigationInfo) {
+        if (this.navigationInfo == navigationInfo) return;
+        this.navigationInfo = navigationInfo;
+        markNavigationStructureDirty();
+    }
+
+    protected final void markNavigationStructureDirty() {
+        if (isValid()) getScreen().getPanelManager().markNavigationStructureDirty();
+    }
+
+    protected final void markNavigationGeometryDirty() {
+        if (isValid()) getScreen().getPanelManager().markNavigationGeometryDirty();
     }
 
     public boolean isName(String name) {

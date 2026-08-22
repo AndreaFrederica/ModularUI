@@ -5,6 +5,11 @@ import com.cleanroommc.modularui.api.ITheme;
 import com.cleanroommc.modularui.api.widget.IFocusedWidget;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.api.widget.Interactable;
+import com.cleanroommc.modularui.api.navigation.INavigationActionHandler;
+import com.cleanroommc.modularui.api.navigation.NavigationAction;
+import com.cleanroommc.modularui.api.navigation.NavigationActionResult;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
+import com.cleanroommc.modularui.api.navigation.NavigationRole;
 import com.cleanroommc.modularui.drawable.Stencil;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.TextFieldTheme;
@@ -30,7 +35,12 @@ import java.util.regex.Pattern;
 /**
  * The base of a text input widget. Handles mouse/keyboard input and rendering.
  */
-public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends AbstractScrollWidget<VoidWidget, W> implements IFocusedWidget {
+public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends AbstractScrollWidget<VoidWidget, W>
+        implements IFocusedWidget, INavigationActionHandler {
+
+    private static final NavigationInfo DEFAULT_NAVIGATION = NavigationInfo.builder(NavigationRole.TEXT_INPUT)
+            .actions(NavigationAction.ACTIVATE, NavigationAction.BEGIN_EDIT, NavigationAction.END_EDIT)
+            .build();
 
     public static final DecimalFormat format = new DecimalFormat("###.###");
 
@@ -60,6 +70,24 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
     protected Integer markedColor;
     protected String hintText = null;
     protected Integer hintTextColor;
+
+    @Override
+    protected NavigationInfo getDefaultNavigationInfo() {
+        return DEFAULT_NAVIGATION;
+    }
+
+    @Override
+    public NavigationActionResult onNavigationAction(NavigationAction action) {
+        if (action == NavigationAction.ACTIVATE || action == NavigationAction.BEGIN_EDIT) {
+            getContext().focus(this);
+            return NavigationActionResult.HANDLED;
+        }
+        if (action == NavigationAction.END_EDIT) {
+            if (isFocused()) getContext().removeFocus();
+            return NavigationActionResult.HANDLED;
+        }
+        return NavigationActionResult.IGNORED;
+    }
 
     public BaseTextFieldWidget() {
         super(new HorizontalScrollData(false, 4), null);

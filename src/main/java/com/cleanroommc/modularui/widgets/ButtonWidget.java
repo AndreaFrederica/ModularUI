@@ -6,6 +6,9 @@ import com.cleanroommc.modularui.api.UpOrDown;
 import com.cleanroommc.modularui.api.value.ISyncOrValue;
 import com.cleanroommc.modularui.api.widget.IGuiAction;
 import com.cleanroommc.modularui.api.widget.Interactable;
+import com.cleanroommc.modularui.api.navigation.NavigationAction;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
+import com.cleanroommc.modularui.api.navigation.NavigationRole;
 import com.cleanroommc.modularui.drawable.GuiTextures;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
 import com.cleanroommc.modularui.value.sync.InteractionSyncHandler;
@@ -14,6 +17,10 @@ import com.cleanroommc.modularui.widget.SingleChildWidget;
 import org.jetbrains.annotations.NotNull;
 
 public class ButtonWidget<W extends ButtonWidget<W>> extends SingleChildWidget<W> implements Interactable {
+
+    private static final NavigationInfo DEFAULT_NAVIGATION = NavigationInfo.builder(NavigationRole.BUTTON)
+            .actions(NavigationAction.ACTIVATE, NavigationAction.SECONDARY)
+            .build();
 
     public static ButtonWidget<?> panelCloseButton() {
         ButtonWidget<?> buttonWidget = new ButtonWidget<>();
@@ -40,6 +47,11 @@ public class ButtonWidget<W extends ButtonWidget<W>> extends SingleChildWidget<W
     private IGuiAction.KeyPressed keyTapped;
 
     private InteractionSyncHandler syncHandler;
+
+    @Override
+    protected NavigationInfo getDefaultNavigationInfo() {
+        return DEFAULT_NAVIGATION;
+    }
 
     @Override
     public WidgetThemeEntry<?> getWidgetThemeInternal(ITheme theme) {

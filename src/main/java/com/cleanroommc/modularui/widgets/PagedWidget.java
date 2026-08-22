@@ -1,5 +1,10 @@
 package com.cleanroommc.modularui.widgets;
 
+import com.cleanroommc.modularui.api.navigation.INavigationActionHandler;
+import com.cleanroommc.modularui.api.navigation.NavigationAction;
+import com.cleanroommc.modularui.api.navigation.NavigationActionResult;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
+import com.cleanroommc.modularui.api.navigation.NavigationRole;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.widget.Widget;
 
@@ -11,13 +16,35 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntConsumer;
 
-public class PagedWidget<W extends PagedWidget<W>> extends Widget<W> {
+public class PagedWidget<W extends PagedWidget<W>> extends Widget<W> implements INavigationActionHandler {
 
     private final List<IWidget> pages = new ArrayList<>();
     private IWidget currentPage;
     private int currentPageIndex = 0;
     @Nullable
     private IntConsumer onPageChange;
+
+    @Override
+    protected NavigationInfo getDefaultNavigationInfo() {
+        return NavigationInfo.builder(NavigationRole.TAB_LIST)
+                .actions(NavigationAction.PAGE_PREVIOUS, NavigationAction.PAGE_NEXT)
+                .focusable(false)
+                .build();
+    }
+
+    @Override
+    public NavigationActionResult onNavigationAction(NavigationAction action) {
+        if (this.pages.isEmpty()) return NavigationActionResult.IGNORED;
+        if (action == NavigationAction.PAGE_PREVIOUS) {
+            previousPage();
+            return NavigationActionResult.CHANGED;
+        }
+        if (action == NavigationAction.PAGE_NEXT) {
+            nextPage();
+            return NavigationActionResult.CHANGED;
+        }
+        return NavigationActionResult.IGNORED;
+    }
 
     @Override
     public void afterInit() {

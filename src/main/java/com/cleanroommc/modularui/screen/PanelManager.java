@@ -43,6 +43,8 @@ public class PanelManager {
     private final Map<String, IPanelHandler> panelHandlerMap = new Object2ObjectOpenHashMap<>();
     private boolean cantDisposeNow = false;
     private boolean dirty = false;
+    private long navigationStructureRevision = 1L;
+    private long navigationGeometryRevision = 1L;
     private State state = State.INIT;
 
     public PanelManager(ModularScreen screen, ModularPanel panel) {
@@ -97,6 +99,7 @@ public class PanelManager {
         panel.setPanelGuiContext(this.screen.getContext());
         this.panels.addFirst(panel);
         this.dirty = true;
+        markNavigationStructureDirty();
         panel.onOpen(this.screen);
         if (resize) {
             WidgetTree.resizeInternal(panel.resizer(), true);
@@ -208,6 +211,7 @@ public class PanelManager {
         if (this.panels.remove(panel)) {
             finalizePanel(panel);
             this.dirty = true;
+            markNavigationStructureDirty();
         }
     }
 
@@ -220,6 +224,7 @@ public class PanelManager {
             // any open panel will be set to closed, but will not actually be removed, so it can be reopened
             this.panels.forEach(this::finalizePanel);
             setState(State.CLOSED);
+            markNavigationStructureDirty();
             this.screen.onClose();
             return true;
         }
@@ -231,6 +236,7 @@ public class PanelManager {
         // this is useful when we expect the screen to reopen at some point and the sync managers are still available
         if (this.state.isOpen) {
             setState(State.CLOSED);
+            markNavigationStructureDirty();
             this.screen.onClose();
         }
     }
@@ -275,6 +281,7 @@ public class PanelManager {
         this.panels.clear();
         this.panelsClone.clear();
         this.dirty = false;
+        markNavigationStructureDirty();
         setState(State.DISPOSED);
     }
 
@@ -361,6 +368,7 @@ public class PanelManager {
         ModularPanel panel = this.panels.remove(panelIndex);
         this.panels.add(target, panel);
         this.dirty = true;
+        markNavigationStructureDirty();
     }
 
     private int getTopSubPanelIndexOf(ModularPanel target) {
@@ -418,6 +426,23 @@ public class PanelManager {
     public Iterable<ModularPanel> getReverseOpenPanels() {
         checkDirty();
         return this.reversePanels;
+    }
+
+    public long getNavigationStructureRevision() {
+        return this.navigationStructureRevision;
+    }
+
+    public long getNavigationGeometryRevision() {
+        return this.navigationGeometryRevision;
+    }
+
+    public void markNavigationStructureDirty() {
+        this.navigationStructureRevision++;
+        this.navigationGeometryRevision++;
+    }
+
+    public void markNavigationGeometryDirty() {
+        this.navigationGeometryRevision++;
     }
 
     private void setState(State state) {

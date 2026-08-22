@@ -89,6 +89,7 @@ public class AbstractParentWidget<I extends IWidget, W extends AbstractParentWid
             child.initialise(this, true);
         }
         onChildAdd(child);
+        markNavigationStructureDirty();
         return true;
     }
 
@@ -96,6 +97,7 @@ public class AbstractParentWidget<I extends IWidget, W extends AbstractParentWid
         if (this.children.remove(child)) {
             if (isValid()) child.dispose();
             onChildRemove(child);
+            markNavigationStructureDirty();
             return true;
         }
         return false;
@@ -108,6 +110,7 @@ public class AbstractParentWidget<I extends IWidget, W extends AbstractParentWid
         I child = this.children.remove(index);
         if (isValid()) child.dispose();
         onChildRemove(child);
+        markNavigationStructureDirty();
         return true;
     }
 
@@ -118,6 +121,7 @@ public class AbstractParentWidget<I extends IWidget, W extends AbstractParentWid
             onChildRemove(i);
         }
         this.children.clear();
+        markNavigationStructureDirty();
         return true;
     }
 

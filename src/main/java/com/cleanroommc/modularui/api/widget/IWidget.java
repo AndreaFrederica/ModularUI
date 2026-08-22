@@ -3,6 +3,8 @@ package com.cleanroommc.modularui.api.widget;
 import com.cleanroommc.modularui.api.ITheme;
 import com.cleanroommc.modularui.api.ITreeNode;
 import com.cleanroommc.modularui.api.layout.IViewportStack;
+import com.cleanroommc.modularui.api.navigation.INavigationElement;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
 import com.cleanroommc.modularui.drawable.Stencil;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.ModularScreen;
@@ -22,7 +24,12 @@ import java.util.function.Consumer;
 /**
  * A widget in a Gui.
  */
-public interface IWidget extends IGuiElement, ITreeNode<IWidget> {
+public interface IWidget extends IGuiElement, ITreeNode<IWidget>, INavigationElement {
+
+    @Override
+    default NavigationInfo getNavigationInfo() {
+        return NavigationInfo.NONE;
+    }
 
     /**
      * @return the screen this element is in
@@ -363,11 +370,11 @@ public interface IWidget extends IGuiElement, ITreeNode<IWidget> {
      * @return if all ancestors are enabled.
      */
     default boolean areAncestorsEnabled() {
-        IWidget parent = this;
-        do {
-            if (!parent.isEnabled()) return false;
-            parent = parent.getParent();
-        } while (parent.hasParent());
+        IWidget current = this;
+        while (current != null) {
+            if (!current.isEnabled()) return false;
+            current = current.getParent();
+        }
         return true;
     }
 

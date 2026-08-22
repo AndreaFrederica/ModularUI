@@ -11,6 +11,12 @@ import com.cleanroommc.modularui.api.value.IIntValue;
 import com.cleanroommc.modularui.api.value.ISyncOrValue;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.api.widget.Interactable;
+import com.cleanroommc.modularui.api.navigation.INavigationActionHandler;
+import com.cleanroommc.modularui.api.navigation.NavigationAction;
+import com.cleanroommc.modularui.api.navigation.NavigationActionResult;
+import com.cleanroommc.modularui.api.navigation.NavigationAxis;
+import com.cleanroommc.modularui.api.navigation.NavigationInfo;
+import com.cleanroommc.modularui.api.navigation.NavigationRole;
 import com.cleanroommc.modularui.drawable.UITexture;
 import com.cleanroommc.modularui.screen.RichTooltip;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
@@ -24,7 +30,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Arrays;
 import java.util.function.Consumer;
 
-public class AbstractCycleButtonWidget<W extends AbstractCycleButtonWidget<W>> extends SingleChildWidget<W> implements Interactable {
+public class AbstractCycleButtonWidget<W extends AbstractCycleButtonWidget<W>> extends SingleChildWidget<W>
+        implements Interactable, INavigationActionHandler {
+
+    private static final NavigationInfo DEFAULT_NAVIGATION = NavigationInfo.builder(NavigationRole.CYCLE)
+            .actions(NavigationAction.ACTIVATE, NavigationAction.INCREMENT, NavigationAction.DECREMENT)
+            .primaryAxis(NavigationAxis.HORIZONTAL)
+            .build();
 
     private static final RichTooltip[] EMPTY_TOOLTIP = new RichTooltip[0];
 
@@ -40,6 +52,26 @@ public class AbstractCycleButtonWidget<W extends AbstractCycleButtonWidget<W>> e
     protected RichTooltip[] tooltip = EMPTY_TOOLTIP;
     protected IWidget[] stateChildren = null;
     protected IWidget fallbackChild = null;
+
+    @Override
+    protected NavigationInfo getDefaultNavigationInfo() {
+        return DEFAULT_NAVIGATION;
+    }
+
+    @Override
+    public NavigationActionResult onNavigationAction(NavigationAction action) {
+        if (action == NavigationAction.ACTIVATE || action == NavigationAction.INCREMENT) {
+            next();
+            Interactable.playButtonClickSound();
+            return NavigationActionResult.CHANGED;
+        }
+        if (action == NavigationAction.DECREMENT) {
+            prev();
+            Interactable.playButtonClickSound();
+            return NavigationActionResult.CHANGED;
+        }
+        return NavigationActionResult.IGNORED;
+    }
 
     @Override
     public void onInit() {
