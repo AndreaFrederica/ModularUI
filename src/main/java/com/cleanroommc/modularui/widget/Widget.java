@@ -3,6 +3,10 @@ package com.cleanroommc.modularui.widget;
 import com.cleanroommc.modularui.api.ITheme;
 import com.cleanroommc.modularui.api.IThemeApi;
 import com.cleanroommc.modularui.api.drawable.IDrawable;
+import com.cleanroommc.modularui.api.event.EventListenerOptions;
+import com.cleanroommc.modularui.api.event.MuiEvent;
+import com.cleanroommc.modularui.api.event.MuiEventListener;
+import com.cleanroommc.modularui.api.event.MuiEventType;
 import com.cleanroommc.modularui.api.layout.IViewportStack;
 import com.cleanroommc.modularui.api.value.ISyncOrValue;
 import com.cleanroommc.modularui.api.value.IValue;
@@ -564,6 +568,19 @@ public class Widget<W extends Widget<W>> extends AbstractWidget implements IPosi
     // --------------
     // === Events ===
     // --------------
+
+    /** Registers a DOM-style event listener and returns this widget for builder chains. */
+    public <E extends MuiEvent> W onEvent(MuiEventType<E> type, MuiEventListener<? super E> listener) {
+        addEventListener(type, listener);
+        return getThis();
+    }
+
+    /** Registers a DOM-style event listener with options and returns this widget for builder chains. */
+    public <E extends MuiEvent> W onEvent(MuiEventType<E> type, MuiEventListener<? super E> listener,
+                                         EventListenerOptions options) {
+        addEventListener(type, listener, options);
+        return getThis();
+    }
 
     /**
      * Called once every tick (20 times per second). Overriding is fine, but super should be called. This will be called even of the widget

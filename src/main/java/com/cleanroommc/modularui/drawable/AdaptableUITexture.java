@@ -1,6 +1,8 @@
 package com.cleanroommc.modularui.drawable;
 
+import com.cleanroommc.modularui.ModularUI;
 import com.cleanroommc.modularui.utils.Platform;
+import com.cleanroommc.modularui.api.debug.MuiDiagnostics;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
@@ -9,12 +11,18 @@ import net.minecraft.util.ResourceLocation;
 import com.google.gson.JsonObject;
 
 import java.util.Objects;
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class is a <a href="https://en.wikipedia.org/wiki/9-slice_scaling">9-slice texture</a>. It can be created using
  * {@link UITexture.Builder#adaptable(int, int, int, int)}.
  */
 public class AdaptableUITexture extends UITexture {
+
+    private static final Set<ResourceLocation> FAILED_TEXTURES =
+            Collections.newSetFromMap(new ConcurrentHashMap<ResourceLocation, Boolean>());
 
     private final int imageWidth, imageHeight, bl, bt, br, bb;
     private final boolean tiled;
@@ -64,7 +72,7 @@ public class AdaptableUITexture extends UITexture {
             return;
         }
         Platform.setupDrawTex(this.nonOpaque);
-        Minecraft.getMinecraft().renderEngine.bindTexture(this.location);
+        if (!bindTextureSafely(x, y, width, height)) return;
 
         float uBl = this.bl * 1f / this.imageWidth, uBr = this.br * 1f / this.imageWidth;
         float vBt = this.bt * 1f / this.imageHeight, vBb = this.bb * 1f / this.imageHeight;
@@ -119,7 +127,7 @@ public class AdaptableUITexture extends UITexture {
             return;
         }
         Platform.setupDrawTex(this.nonOpaque);
-        Minecraft.getMinecraft().renderEngine.bindTexture(this.location);
+        if (!bindTextureSafely(x, y, width, height)) return;
 
         float uBl = this.bl * 1f / this.imageWidth, uBr = this.br * 1f / this.imageWidth;
         float vBt = this.bt * 1f / this.imageHeight, vBb = this.bb * 1f / this.imageHeight;
@@ -171,6 +179,20 @@ public class AdaptableUITexture extends UITexture {
         });
         GlStateManager.disableBlend();
         GlStateManager.enableAlpha();
+    }
+
+    private boolean bindTextureSafely(float x, float y, float width, float height) {
+        try {
+            Minecraft.getMinecraft().renderEngine.bindTexture(this.location);
+            return true;
+        } catch (RuntimeException exception) {
+            if (FAILED_TEXTURES.add(this.location)) {
+                ModularUI.LOGGER.warn("Unable to load MUI texture {}; drawing a fallback rectangle", this.location, exception);
+                MuiDiagnostics.warn("texture", "Unable to load " + this.location + "; using fallback rectangle", exception);
+            }
+            GuiDraw.drawRect(x, y, width, height, 0xff3c4a57);
+            return false;
+        }
     }
 
     @Override

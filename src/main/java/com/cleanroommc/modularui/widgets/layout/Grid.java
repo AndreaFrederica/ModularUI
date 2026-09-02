@@ -35,6 +35,7 @@ public class Grid extends AbstractScrollWidget<IWidget, Grid> implements ILayout
     private Alignment alignment = Alignment.Center;
     private boolean collapseDisabledChild = false;
     private boolean dirty = false, unsanitized = false;
+    private int domColumns = 1;
 
     public Grid() {
         super(null, null);
@@ -155,8 +156,8 @@ public class Grid extends AbstractScrollWidget<IWidget, Grid> implements ILayout
     }
 
     private void makeFlatList() {
-        super.getChildren().clear();
-        super.getChildren().addAll(this.matrix.stream().flatMap(List::stream).filter(Objects::nonNull).collect(Collectors.toList()));
+        mutableChildren().clear();
+        mutableChildren().addAll(this.matrix.stream().flatMap(List::stream).filter(Objects::nonNull).collect(Collectors.toList()));
     }
 
     @Override
@@ -251,20 +252,97 @@ public class Grid extends AbstractScrollWidget<IWidget, Grid> implements ILayout
 
     @Override
     public boolean addChild(IWidget child, int index) {
-        if (child == this || getChildren().contains(child)) {
+        if (child == null || child == this || getChildren().contains(child)) {
             return false;
         }
         if (index < 0) {
             index = getChildren().size() + index + 1;
         }
-        super.getChildren().add(index, child);
+        List<IWidget> ordered = new ArrayList<>(getChildren());
+        ordered.add(index, child);
+        rebuildDomMatrix(ordered);
         if (isValid()) {
             child.initialise(this, true);
         }
         onChildAdd(child);
-        this.dirty = true;
-        this.unsanitized = true;
+        markNavigationStructureDirty();
+        if (isValid()) getScreen().getDocumentController().onLegacyChildAdded(this, child, index);
         return true;
+    }
+
+    @Override
+    public boolean supportsDomChildMutations() {
+        return true;
+    }
+
+    @Override
+    public void removeDomChild(IWidget child) {
+        List<IWidget> ordered = new ArrayList<>(getChildren());
+        if (!ordered.remove(child)) throw new IllegalStateException("Failed to remove Grid DOM child");
+        if (isValid()) child.dispose();
+        onChildRemove(child);
+        rebuildDomMatrix(ordered);
+        markNavigationStructureDirty();
+        if (isValid()) getScreen().getDocumentController().onLegacyChildRemoved(this, child);
+    }
+
+    @Override
+    public void moveDomChild(int from, int to) {
+        List<IWidget> ordered = new ArrayList<>(getChildren());
+        if (from < 0 || from >= ordered.size() || to < 0 || to >= ordered.size()) {
+            throw new IllegalStateException("Grid DOM child move is out of bounds");
+        }
+        IWidget child = ordered.remove(from);
+        ordered.add(to, child);
+        rebuildDomMatrix(ordered);
+        markNavigationStructureDirty();
+        if (isValid()) getScreen().getDocumentController().onLegacyChildMoved(this, child, to);
+    }
+
+    @Override
+    public void detachDomChildForMove(IWidget child) {
+        List<IWidget> ordered = new ArrayList<>(getChildren());
+        if (!ordered.remove(child)) throw new IllegalStateException("Failed to detach Grid DOM child");
+        onChildRemove(child);
+        rebuildDomMatrix(ordered);
+        markNavigationStructureDirty();
+    }
+
+    @Override
+    public void attachMovedDomChild(IWidget child, int index) {
+        List<IWidget> ordered = new ArrayList<>(getChildren());
+        ordered.add(index, child);
+        rebuildDomMatrix(ordered);
+        if (child instanceof com.cleanroommc.modularui.widget.AbstractWidget widget) widget.reparentInternal(this);
+        else throw new IllegalStateException("A third-party IWidget cannot be reparented without remounting");
+        onChildAdd(child);
+        markNavigationStructureDirty();
+    }
+
+    @ApiStatus.Internal
+    public void setDomColumns(int columns) {
+        if (columns <= 0) throw new IllegalArgumentException("Grid columns must be positive");
+        if (this.domColumns == columns) return;
+        List<IWidget> ordered = new ArrayList<>(getChildren());
+        this.domColumns = columns;
+        rebuildDomMatrix(ordered);
+        if (isValid()) scheduleResize();
+    }
+
+    @ApiStatus.Internal
+    public int getDomColumns() {
+        return this.domColumns;
+    }
+
+    private void rebuildDomMatrix(List<IWidget> ordered) {
+        this.matrix.clear();
+        for (int i = 0; i < ordered.size(); i += this.domColumns) {
+            this.matrix.add(new ArrayList<>(ordered.subList(i, Math.min(i + this.domColumns, ordered.size()))));
+        }
+        mutableChildren().clear();
+        mutableChildren().addAll(ordered);
+        this.dirty = false;
+        this.unsanitized = true;
     }
 
     public Grid child(@Nullable IWidget widget) {

@@ -3,6 +3,8 @@ package com.cleanroommc.modularui.screen.viewport;
 import com.cleanroommc.modularui.ClientProxy;
 import com.cleanroommc.modularui.api.ITheme;
 import com.cleanroommc.modularui.api.MCHelper;
+import com.cleanroommc.modularui.api.event.FocusEvent;
+import com.cleanroommc.modularui.api.event.IEventTarget;
 import com.cleanroommc.modularui.api.widget.IDraggable;
 import com.cleanroommc.modularui.api.widget.IFocusedWidget;
 import com.cleanroommc.modularui.api.widget.IVanillaSlot;
@@ -13,6 +15,7 @@ import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.cleanroommc.modularui.screen.RecipeViewerSettingsImpl;
 import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.screen.event.InputDispatchMode;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
@@ -45,6 +48,8 @@ public class ModularGuiContext extends GuiContext {
     private LocatedWidget focusedWidget = LocatedWidget.EMPTY;
     private List<LocatedWidget> belowMouse = Collections.emptyList();
     private List<LocatedWidget> hovered = Collections.emptyList();
+    private HitTestSnapshot hitTestSnapshot = HitTestSnapshot.EMPTY;
+    private long hitTestSequence;
     private LocatedWidget resizeable = null;
     private final HoveredIterable hoveredWidgets;
 
@@ -135,6 +140,10 @@ public class ModularGuiContext extends GuiContext {
         return this.hovered.isEmpty() ? null : this.hovered.get(0).getElement();
     }
 
+    public HitTestSnapshot getHitTestSnapshot() {
+        return this.hitTestSnapshot;
+    }
+
     public @UnmodifiableView Iterable<IWidget> getAllHovered() {
         return this.hoveredIterable;
     }
@@ -189,18 +198,40 @@ public class ModularGuiContext extends GuiContext {
             throw new IllegalArgumentException();
         }
 
-        if (this.focusedWidget.getElement() != null) {
-            IFocusedWidget focusedWidget = (IFocusedWidget) this.focusedWidget.getElement();
+        IWidget oldTarget = this.focusedWidget.getElement();
+        IWidget newTarget = widget.getElement();
+
+        if (oldTarget != null) {
+            IFocusedWidget focusedWidget = (IFocusedWidget) oldTarget;
             focusedWidget.onRemoveFocus(this);
+            this.screen.getDocumentController().updateInteractionState(oldTarget, "data-focus", false);
             this.screen.setFocused(false);
         }
 
         this.focusedWidget = widget;
 
-        if (this.focusedWidget.getElement() != null) {
-            IFocusedWidget focusedWidget = (IFocusedWidget) this.focusedWidget.getElement();
+        if (newTarget != null) {
+            IFocusedWidget focusedWidget = (IFocusedWidget) newTarget;
             focusedWidget.onFocus(this);
+            this.screen.getDocumentController().updateInteractionState(newTarget, "data-focus", true);
             this.screen.setFocused(true);
+        }
+
+        if (this.screen.getInputDispatchMode() != InputDispatchMode.LEGACY) {
+            dispatchFocusEvents(oldTarget, newTarget);
+        }
+    }
+
+    private void dispatchFocusEvents(@Nullable IWidget oldTarget, @Nullable IWidget newTarget) {
+        IEventTarget oldRelated = oldTarget;
+        IEventTarget newRelated = newTarget;
+        if (oldTarget != null) {
+            this.screen.getEventDispatcher().dispatch(oldTarget, new FocusEvent(FocusEvent.FOCUS_OUT, newRelated));
+            this.screen.getEventDispatcher().dispatch(oldTarget, new FocusEvent(FocusEvent.BLUR, newRelated));
+        }
+        if (newTarget != null) {
+            this.screen.getEventDispatcher().dispatch(newTarget, new FocusEvent(FocusEvent.FOCUS, oldRelated));
+            this.screen.getEventDispatcher().dispatch(newTarget, new FocusEvent(FocusEvent.FOCUS_IN, oldRelated));
         }
     }
 
@@ -381,29 +412,62 @@ public class ModularGuiContext extends GuiContext {
             this.draggable.getElement().onDrag(this.lastButton, this.lastClickTime);
             this.draggable.unapplyMatrix(this);
         }
-        List<LocatedWidget> newBelowMouse = this.screen.getPanelManager().getAllHoveredWidgetsList(false);
+        List<LocatedWidget> rawBelowMouse = this.screen.getPanelManager().getAllHoveredWidgetsList(false);
+        List<LocatedWidget> newBelowMouse = filterPointerEvents(rawBelowMouse);
         if (!newBelowMouse.isEmpty()) {
             List<LocatedWidget> oldBelowMouse = this.belowMouse;
             this.belowMouse = newBelowMouse;
             for (LocatedWidget lw : this.belowMouse) {
                 if (lw.getElement().isValid() && !lw.getElement().isBelowMouse()) {
                     lw.getElement().onMouseEnterArea();
+                    this.screen.getDocumentController().updateInteractionState(lw.getElement(), "data-below-mouse", true);
                 }
             }
             List<LocatedWidget> newHovered = getHoveredWidgets(newBelowMouse);
             List<LocatedWidget> oldHovered = this.hovered;
             this.hovered = newHovered;
 
-            checkHoverEnd(newHovered, oldHovered, IWidget::onMouseEndHover);
-            checkHoverEnd(newBelowMouse, oldBelowMouse, IWidget::onMouseLeaveArea);
+            checkHoverEnd(newHovered, oldHovered, widget -> {
+                widget.onMouseEndHover();
+                this.screen.getDocumentController().updateInteractionState(widget, "data-hover", false);
+            });
+            checkHoverEnd(newBelowMouse, oldBelowMouse, widget -> {
+                widget.onMouseLeaveArea();
+                this.screen.getDocumentController().updateInteractionState(widget, "data-below-mouse", false);
+            });
         } else {
-            checkHoverEnd(null, this.hovered, IWidget::onMouseEndHover);
-            checkHoverEnd(null, this.belowMouse, IWidget::onMouseLeaveArea);
+            checkHoverEnd(null, this.hovered, widget -> {
+                widget.onMouseEndHover();
+                this.screen.getDocumentController().updateInteractionState(widget, "data-hover", false);
+            });
+            checkHoverEnd(null, this.belowMouse, widget -> {
+                widget.onMouseLeaveArea();
+                this.screen.getDocumentController().updateInteractionState(widget, "data-below-mouse", false);
+            });
             this.hovered = Collections.emptyList();
             this.belowMouse = Collections.emptyList();
             this.resizeable = null;
             ClientProxy.resetCursorIcon();
         }
+        this.hitTestSnapshot = HitTestSnapshot.capture(++this.hitTestSequence,
+                this.screen.getPanelManager().getNavigationStructureRevision(),
+                this.screen.getPanelManager().getNavigationGeometryRevision(),
+                this.belowMouse, this.hovered,
+                this.belowMouse.isEmpty() ? null : this.belowMouse.get(0).getElement());
+    }
+
+    private List<LocatedWidget> filterPointerEvents(List<LocatedWidget> candidates) {
+        if (candidates.isEmpty()) return candidates;
+        List<LocatedWidget> filtered = null;
+        for (int i = 0; i < candidates.size(); i++) {
+            LocatedWidget candidate = candidates.get(i);
+            if (this.screen.getDocumentController().acceptsPointerEvents(candidate.getElement())) {
+                if (filtered != null) filtered.add(candidate);
+            } else if (filtered == null) {
+                filtered = new ArrayList<>(candidates.subList(0, i));
+            }
+        }
+        return filtered == null ? candidates : filtered;
     }
 
     private List<LocatedWidget> getHoveredWidgets(List<LocatedWidget> belowMouse) {
@@ -417,6 +481,7 @@ public class ModularGuiContext extends GuiContext {
                 newHovered.add(lw);
                 if (!lw.getElement().isHovering()) {
                     lw.getElement().onMouseStartHover();
+                    this.screen.getDocumentController().updateInteractionState(lw.getElement(), "data-hover", true);
                 }
                 if (slot == null && lw.getElement() instanceof IVanillaSlot vanillaSlot && vanillaSlot.handleAsVanillaSlot()) {
                     slot = vanillaSlot.getVanillaSlot();

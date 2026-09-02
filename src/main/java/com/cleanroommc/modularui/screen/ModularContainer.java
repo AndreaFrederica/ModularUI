@@ -173,6 +173,11 @@ public class ModularContainer extends Container {
         }
     }
 
+    @ApiStatus.Internal
+    public boolean isSlotRegistered(ModularSlot slot) {
+        return this.inventorySlots.contains(slot) || this.phantomSlots.contains(slot);
+    }
+
     @Contract("_, null, null -> fail")
     @NotNull
     @ApiStatus.Internal

@@ -6,6 +6,7 @@ import com.cleanroommc.modularui.api.UIFactory;
 import com.cleanroommc.modularui.factory.GuiData;
 import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.network.NetworkUtils;
+import com.cleanroommc.modularui.api.sync.MuiProtocolInstallation;
 
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.entity.player.EntityPlayer;
@@ -29,6 +30,7 @@ public class UISettings {
     private Predicate<EntityPlayer> canInteractWith;
     private String theme;
     private final RecipeViewerSettings recipeViewerSettings;
+    private MuiProtocolInstallation protocolInstallation;
 
     public UISettings() {
         this(new RecipeViewerSettingsImpl());
@@ -133,6 +135,16 @@ public class UISettings {
 
     public @Nullable String getTheme() {
         return theme;
+    }
+
+    public @Nullable MuiProtocolInstallation getProtocolInstallation() {
+        return this.protocolInstallation;
+    }
+
+    @ApiStatus.Internal
+    public void installProtocol(MuiProtocolInstallation installation) {
+        if (this.protocolInstallation != null) throw new IllegalStateException("A protocol installation is already present");
+        this.protocolInstallation = java.util.Objects.requireNonNull(installation, "installation");
     }
 
     public interface GuiCreator {

@@ -17,6 +17,8 @@ import org.jetbrains.annotations.Nullable;
 @ApiStatus.Internal
 public class PacketSyncHandler implements IPacket {
 
+    public static final int MAX_PAYLOAD_BYTES = 1 << 20;
+
     public int networkId;
     public String panel;
     public String key;
@@ -39,16 +41,16 @@ public class PacketSyncHandler implements IPacket {
         NetworkUtils.writeStringSafe(buf, this.panel, 256, true);
         NetworkUtils.writeStringSafe(buf, this.key, 256, true);
         buf.writeBoolean(this.action);
-        NetworkUtils.writeByteBuf(buf, this.packet);
+        NetworkUtils.writeByteBuf(buf, this.packet, MAX_PAYLOAD_BYTES);
     }
 
     @Override
     public void read(PacketBuffer buf) {
         this.networkId = buf.readVarInt();
-        this.panel = NetworkUtils.readStringSafe(buf);
-        this.key = NetworkUtils.readStringSafe(buf);
+        this.panel = NetworkUtils.readStringSafe(buf, 256);
+        this.key = NetworkUtils.readStringSafe(buf, 256);
         this.action = buf.readBoolean();
-        this.packet = NetworkUtils.readPacketBuffer(buf);
+        this.packet = NetworkUtils.readPacketBuffer(buf, MAX_PAYLOAD_BYTES);
     }
 
     @SideOnly(Side.CLIENT)

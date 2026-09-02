@@ -6,11 +6,28 @@ import com.cleanroommc.modularui.api.ITheme;
 import com.cleanroommc.modularui.api.IThemeApi;
 import com.cleanroommc.modularui.api.MCHelper;
 import com.cleanroommc.modularui.api.UpOrDown;
+import com.cleanroommc.modularui.api.event.IEventTarget;
+import com.cleanroommc.modularui.api.event.InputModifiers;
+import com.cleanroommc.modularui.api.event.KeyEvent;
+import com.cleanroommc.modularui.api.event.MuiEventType;
+import com.cleanroommc.modularui.api.event.PointerEvent;
 import com.cleanroommc.modularui.api.widget.IGuiAction;
 import com.cleanroommc.modularui.api.widget.IWidget;
+import com.cleanroommc.modularui.api.dom.MuiDocument;
+import com.cleanroommc.modularui.api.component.MuiElementRegistry;
+import com.cleanroommc.modularui.api.component.MuiComponentRegistry;
+import com.cleanroommc.modularui.api.markup.MuiResourceResolver;
+import com.cleanroommc.modularui.markup.MuiDocumentCompiler;
+import com.cleanroommc.modularui.style.MuiCascade;
+import com.cleanroommc.modularui.style.MuiComputedStyle;
 import com.cleanroommc.modularui.drawable.GuiDraw;
 import com.cleanroommc.modularui.overlay.ScreenWrapper;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
+import com.cleanroommc.modularui.screen.viewport.HitTestSnapshot;
+import com.cleanroommc.modularui.screen.event.InputDispatchMode;
+import com.cleanroommc.modularui.screen.event.MuiEventDispatcher;
+import com.cleanroommc.modularui.screen.dom.MuiScreenDocumentController;
+import com.cleanroommc.modularui.screen.dom.MuiDevToolsSession;
 import com.cleanroommc.modularui.utils.Color;
 import com.cleanroommc.modularui.value.sync.ModularSyncManager;
 import com.cleanroommc.modularui.widget.WidgetTree;
@@ -78,12 +95,20 @@ public class ModularScreen {
     private final String owner;
     private final String name;
     private final PanelManager panelManager;
+    private final MuiScreenDocumentController documentController;
+    private final MuiEventDispatcher eventDispatcher;
     private final ModularGuiContext context = new ModularGuiContext(this);
     private final Map<Class<?>, List<IGuiAction>> guiActionListeners = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectArrayMap<IWidget, Runnable> frameUpdates = new Object2ObjectArrayMap<>();
     private final ScreenResizeNode resizeNode = new ScreenResizeNode(this);
     private boolean pausesGame = false;
     private boolean openParentOnClose = false;
+    private InputDispatchMode inputDispatchMode = InputDispatchMode.HYBRID;
+    private int pointerButtons;
+    @Nullable private IWidget activePointerWidget;
+    private int lastPointerX = Integer.MIN_VALUE;
+    private int lastPointerY = Integer.MIN_VALUE;
+    private boolean containerReadyDispatched;
 
     private String themeOverride;
     private ITheme currentTheme;
@@ -129,6 +154,8 @@ public class ModularScreen {
         Objects.requireNonNull(mainPanel, "The main panel must not be null!");
         this.name = mainPanel.getName();
         this.panelManager = new PanelManager(this, mainPanel);
+        this.documentController = new MuiScreenDocumentController(this);
+        this.eventDispatcher = new MuiEventDispatcher(this);
     }
 
     /**
@@ -156,11 +183,23 @@ public class ModularScreen {
         if (wrapper == null) throw new NullPointerException("GuiScreenWrapper must not be null!");
         this.screenWrapper = wrapper;
         if (this.screenWrapper.getGuiScreen() instanceof GuiContainer container) {
-            ((ModularContainer) container.inventorySlots).initializeClient(this);
+            ModularContainer modularContainer = (ModularContainer) container.inventorySlots;
+            modularContainer.initializeClient(this);
         }
         this.screenWrapper.updateGuiArea(this.panelManager.getMainPanel().getArea());
         this.overlay = false;
     }
+
+    /**
+     * Called once after a synced or client-only container has been attached and the initial panel/widget tree has been
+     * initialized, but before {@link #onOpen()}. At this point named sync handlers, the fixed container slot table, and
+     * valid widgets are all available, so implementations may safely install a DOM document containing pre-registered
+     * {@code ItemSlot} widgets.
+     *
+     * @param container initialized container attached to this screen
+     */
+    @ApiStatus.OverrideOnly
+    public void onContainerReady(ModularContainer container) {}
 
     @ApiStatus.Internal
     @MustBeInvokedByOverriders
@@ -184,7 +223,13 @@ public class ModularScreen {
     public void onResize(int width, int height) {
         this.panelManager.markNavigationGeometryDirty();
         this.context.updateScreenArea(width, height);
+        this.documentController.setMediaEnvironment(width, height);
         if (this.panelManager.tryInit()) {
+            adoptWidgetTree();
+            if (!this.containerReadyDispatched && !isOverlay() && this.screenWrapper.isGuiContainer()) {
+                onContainerReady(getContainer());
+                this.containerReadyDispatched = true;
+            }
             onOpen();
         }
 
@@ -265,6 +310,7 @@ public class ModularScreen {
         for (ModularPanel panel : this.panelManager.getOpenPanels()) {
             WidgetTree.onUpdate(panel);
         }
+        this.documentController.pollScrollState();
     }
 
     /**
@@ -275,6 +321,8 @@ public class ModularScreen {
     @Deprecated
     @MustBeInvokedByOverriders
     public void onFrameUpdate() {
+        this.documentController.flushPendingUpdates();
+        this.documentController.pollScrollState();
         this.panelManager.checkDirty();
         for (ObjectIterator<Object2ObjectMap.Entry<IWidget, Runnable>> iterator = this.frameUpdates.object2ObjectEntrySet().fastIterator(); iterator.hasNext(); ) {
             Object2ObjectMap.Entry<IWidget, Runnable> entry = iterator.next();
@@ -365,6 +413,47 @@ public class ModularScreen {
         return false;
     }
 
+    private IEventTarget getPointerEventTarget() {
+        HitTestSnapshot snapshot = this.context.getHitTestSnapshot();
+        IWidget target = snapshot.getTarget();
+        if (snapshot.matchesRevisions(this.panelManager.getNavigationStructureRevision(),
+                this.panelManager.getNavigationGeometryRevision()) && target != null && target.isValid()
+                && this.documentController.acceptsPointerEvents(target)) {
+            return this.documentController.getCanonicalEventTarget(target);
+        }
+        IWidget fallback = this.panelManager.getTopInteractionTarget();
+        return fallback == null || !this.documentController.acceptsPointerEvents(fallback)
+                ? null : this.documentController.getCanonicalEventTarget(fallback);
+    }
+
+    private IEventTarget getKeyEventTarget() {
+        IWidget focused = this.context.getFocusedWidget().getElement();
+        IWidget target = focused != null && focused.isValid() ? focused : this.panelManager.getTopMostPanel();
+        return this.documentController.getCanonicalEventTarget(target);
+    }
+
+    private boolean dispatchPointerEvent(MuiEventType<PointerEvent> type, int button,
+                                         int deltaX, int deltaY, long durationMillis,
+                                         InputModifiers modifiers) {
+        if (this.inputDispatchMode == InputDispatchMode.LEGACY) return true;
+        IEventTarget target = this.eventDispatcher.resolvePointerTarget(0, getPointerEventTarget());
+        int pointerX = this.context.getAbsMouseX();
+        int pointerY = this.context.getAbsMouseY();
+        this.lastPointerX = pointerX;
+        this.lastPointerY = pointerY;
+        return target == null || this.eventDispatcher.dispatch(target,
+                new PointerEvent(type, 0, pointerX, pointerY,
+                        button, this.pointerButtons, deltaX, deltaY, durationMillis, modifiers));
+    }
+
+    private boolean dispatchKeyEvent(MuiEventType<KeyEvent> type, char typedChar, int keyCode,
+                                     InputModifiers modifiers) {
+        if (this.inputDispatchMode == InputDispatchMode.LEGACY) return true;
+        IEventTarget target = getKeyEventTarget();
+        return target == null || this.eventDispatcher.dispatch(target,
+                new KeyEvent(type, typedChar, keyCode, false, modifiers));
+    }
+
     /**
      * Called when a mouse button is pressed. Tries to invoke
      * {@link com.cleanroommc.modularui.api.widget.Interactable#onMousePressed(int) Interactable#onMousePressed(int)} on every widget under
@@ -375,6 +464,29 @@ public class ModularScreen {
      * @return true if the action was consumed and further processing should be canceled
      */
     public boolean onMousePressed(int mouseButton) {
+        return onMousePressed(mouseButton, InputModifiers.NONE);
+    }
+
+    public boolean onMousePressed(int mouseButton, InputModifiers modifiers) {
+        Objects.requireNonNull(modifiers, "modifiers");
+        Boolean consumed = this.panelManager.doSafe(() -> onMousePressedUnsafe(mouseButton, modifiers));
+        return Boolean.TRUE.equals(consumed);
+    }
+
+    private boolean onMousePressedUnsafe(int mouseButton, InputModifiers modifiers) {
+        if (mouseButton >= 0 && mouseButton < Integer.SIZE) {
+            this.pointerButtons |= 1 << mouseButton;
+        }
+        IWidget pressedWidget = this.context.getTopHovered();
+        if (this.activePointerWidget != null && this.activePointerWidget != pressedWidget) {
+            this.documentController.updateInteractionState(this.activePointerWidget, "data-active", false);
+        }
+        this.activePointerWidget = pressedWidget;
+        if (pressedWidget != null) {
+            this.documentController.updateInteractionState(pressedWidget, "data-active", true);
+        }
+        if (!dispatchPointerEvent(PointerEvent.DOWN, mouseButton, 0, 0, 0, modifiers)) return true;
+        if (this.inputDispatchMode == InputDispatchMode.DOM) return false;
         // call all action listeners
         for (IGuiAction.MousePressed action : getGuiActionListeners(IGuiAction.MousePressed.class)) {
             action.press(mouseButton);
@@ -421,6 +533,31 @@ public class ModularScreen {
      * @return true if the action was consumed and further processing should be canceled
      */
     public boolean onMouseRelease(int mouseButton) {
+        return onMouseRelease(mouseButton, InputModifiers.NONE);
+    }
+
+    public boolean onMouseRelease(int mouseButton, InputModifiers modifiers) {
+        Objects.requireNonNull(modifiers, "modifiers");
+        Boolean consumed = this.panelManager.doSafe(() -> onMouseReleaseUnsafe(mouseButton, modifiers));
+        return Boolean.TRUE.equals(consumed);
+    }
+
+    private boolean onMouseReleaseUnsafe(int mouseButton, InputModifiers modifiers) {
+        if (mouseButton >= 0 && mouseButton < Integer.SIZE) {
+            this.pointerButtons &= ~(1 << mouseButton);
+        }
+        boolean runDefault;
+        try {
+            runDefault = dispatchPointerEvent(PointerEvent.UP, mouseButton, 0, 0, 0, modifiers);
+        } finally {
+            if (this.activePointerWidget != null) {
+                this.documentController.updateInteractionState(this.activePointerWidget, "data-active", false);
+                this.activePointerWidget = null;
+            }
+            this.eventDispatcher.releasePointerCapture(0);
+        }
+        if (!runDefault) return true;
+        if (this.inputDispatchMode == InputDispatchMode.DOM) return false;
         for (IGuiAction.MouseReleased action : getGuiActionListeners(IGuiAction.MouseReleased.class)) {
             action.release(mouseButton);
         }
@@ -448,6 +585,18 @@ public class ModularScreen {
      * @return true if the action was consumed and further processing should be canceled
      */
     public boolean onKeyPressed(char typedChar, int keyCode) {
+        return onKeyPressed(typedChar, keyCode, InputModifiers.NONE);
+    }
+
+    public boolean onKeyPressed(char typedChar, int keyCode, InputModifiers modifiers) {
+        Objects.requireNonNull(modifiers, "modifiers");
+        Boolean consumed = this.panelManager.doSafe(() -> onKeyPressedUnsafe(typedChar, keyCode, modifiers));
+        return Boolean.TRUE.equals(consumed);
+    }
+
+    private boolean onKeyPressedUnsafe(char typedChar, int keyCode, InputModifiers modifiers) {
+        if (!dispatchKeyEvent(KeyEvent.DOWN, typedChar, keyCode, modifiers)) return true;
+        if (this.inputDispatchMode == InputDispatchMode.DOM) return false;
         for (IGuiAction.KeyPressed action : getGuiActionListeners(IGuiAction.KeyPressed.class)) {
             action.press(typedChar, keyCode);
         }
@@ -472,6 +621,18 @@ public class ModularScreen {
      * @return true if the action was consumed and further processing should be canceled
      */
     public boolean onKeyRelease(char typedChar, int keyCode) {
+        return onKeyRelease(typedChar, keyCode, InputModifiers.NONE);
+    }
+
+    public boolean onKeyRelease(char typedChar, int keyCode, InputModifiers modifiers) {
+        Objects.requireNonNull(modifiers, "modifiers");
+        Boolean consumed = this.panelManager.doSafe(() -> onKeyReleaseUnsafe(typedChar, keyCode, modifiers));
+        return Boolean.TRUE.equals(consumed);
+    }
+
+    private boolean onKeyReleaseUnsafe(char typedChar, int keyCode, InputModifiers modifiers) {
+        if (!dispatchKeyEvent(KeyEvent.UP, typedChar, keyCode, modifiers)) return true;
+        if (this.inputDispatchMode == InputDispatchMode.DOM) return false;
         for (IGuiAction.KeyReleased action : getGuiActionListeners(IGuiAction.KeyReleased.class)) {
             action.release(typedChar, keyCode);
         }
@@ -497,6 +658,19 @@ public class ModularScreen {
      * @return true if the action was consumed and further processing should be canceled
      */
     public boolean onMouseScroll(UpOrDown scrollDirection, int amount) {
+        return onMouseScroll(scrollDirection, amount, InputModifiers.NONE);
+    }
+
+    public boolean onMouseScroll(UpOrDown scrollDirection, int amount, InputModifiers modifiers) {
+        Objects.requireNonNull(modifiers, "modifiers");
+        Boolean consumed = this.panelManager.doSafe(() -> onMouseScrollUnsafe(scrollDirection, amount, modifiers));
+        return Boolean.TRUE.equals(consumed);
+    }
+
+    private boolean onMouseScrollUnsafe(UpOrDown scrollDirection, int amount, InputModifiers modifiers) {
+        if (!dispatchPointerEvent(PointerEvent.WHEEL, -1, 0,
+                scrollDirection.modifier * amount, 0, modifiers)) return true;
+        if (this.inputDispatchMode == InputDispatchMode.DOM) return false;
         for (IGuiAction.MouseScroll action : getGuiActionListeners(IGuiAction.MouseScroll.class)) {
             action.scroll(scrollDirection, amount);
         }
@@ -521,6 +695,31 @@ public class ModularScreen {
      * @return true if the action was consumed and further processing should be canceled
      */
     public boolean onMouseDrag(int mouseButton, long timeSinceClick) {
+        return onMouseDrag(mouseButton, timeSinceClick, InputModifiers.NONE);
+    }
+
+    public boolean onMouseDrag(int mouseButton, long timeSinceClick, InputModifiers modifiers) {
+        Objects.requireNonNull(modifiers, "modifiers");
+        Boolean consumed = this.panelManager.doSafe(() -> onMouseDragUnsafe(mouseButton, timeSinceClick, modifiers));
+        return Boolean.TRUE.equals(consumed);
+    }
+
+    /** Dispatches pointer movement which has no legacy default action. */
+    @ApiStatus.Internal
+    public boolean onPointerMove(InputModifiers modifiers) {
+        Objects.requireNonNull(modifiers, "modifiers");
+        Boolean consumed = this.panelManager.doSafe(() -> {
+            int pointerX = this.context.getAbsMouseX();
+            int pointerY = this.context.getAbsMouseY();
+            if (pointerX == this.lastPointerX && pointerY == this.lastPointerY) return false;
+            return !dispatchPointerEvent(PointerEvent.MOVE, -1, 0, 0, 0, modifiers);
+        });
+        return Boolean.TRUE.equals(consumed);
+    }
+
+    private boolean onMouseDragUnsafe(int mouseButton, long timeSinceClick, InputModifiers modifiers) {
+        if (!dispatchPointerEvent(PointerEvent.MOVE, mouseButton, 0, 0, timeSinceClick, modifiers)) return true;
+        if (this.inputDispatchMode == InputDispatchMode.DOM) return false;
         for (IGuiAction.MouseDrag action : getGuiActionListeners(IGuiAction.MouseDrag.class)) {
             action.drag(mouseButton, timeSinceClick);
         }
@@ -603,6 +802,94 @@ public class ModularScreen {
 
     public PanelManager getPanelManager() {
         return panelManager;
+    }
+
+    public MuiEventDispatcher getEventDispatcher() {
+        return this.eventDispatcher;
+    }
+
+    public MuiDocument getDocument() {
+        return this.documentController.getDocument();
+    }
+
+    /** Installs a client-only stylesheet. It affects rendering/layout projection, never server sync state. */
+    public void setStylesheet(@Nullable MuiCascade stylesheet) {
+        this.documentController.setStylesheet(stylesheet);
+    }
+
+    public @Nullable MuiCascade getStylesheet() {
+        return this.documentController.getStylesheet();
+    }
+
+    public @Nullable MuiComputedStyle getComputedStyle(com.cleanroommc.modularui.api.dom.MuiElement element) {
+        return this.documentController.getComputedStyle(element);
+    }
+
+    /**
+     * Compiles an XML document (and its registered components) directly below the main panel.
+     * The call uses the same DOM transaction and Widget projection as programmatic mutations.
+     */
+    public com.cleanroommc.modularui.api.dom.MuiElement installCompiledDocument(
+            String owner, String source, MuiComponentRegistry components, MuiResourceResolver resolver) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(components, "components");
+        Objects.requireNonNull(resolver, "resolver");
+        this.documentController.adoptPanel(this.panelManager.getMainPanel());
+        com.cleanroommc.modularui.api.dom.MuiElement panel = this.documentController.getElement(this.panelManager.getMainPanel());
+        if (panel == null) throw new IllegalStateException("Main panel has not been adopted into the document");
+        return new MuiDocumentCompiler(components, resolver).compile(owner, source, getDocument(), panel);
+    }
+
+    /** Compiles and atomically replaces one connected XML root below the main panel. */
+    public com.cleanroommc.modularui.api.dom.MuiElement replaceCompiledDocument(
+            com.cleanroommc.modularui.api.dom.MuiElement currentRoot, String owner, String source,
+            MuiComponentRegistry components, MuiResourceResolver resolver) {
+        Objects.requireNonNull(currentRoot, "currentRoot");
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(components, "components");
+        Objects.requireNonNull(resolver, "resolver");
+        if (currentRoot.getOwnerDocument() != getDocument() || !currentRoot.isConnected()) {
+            throw new IllegalArgumentException("Current XML root is not connected to this screen");
+        }
+        com.cleanroommc.modularui.api.dom.MuiNode parent = currentRoot.getParentNode();
+        if (!(parent instanceof com.cleanroommc.modularui.api.dom.MuiElement)) {
+            throw new IllegalArgumentException("Current XML root has no element parent");
+        }
+
+        com.cleanroommc.modularui.api.dom.MuiElement replacement =
+                new MuiDocumentCompiler(components, resolver).compileDetached(owner, source, getDocument());
+        try (com.cleanroommc.modularui.api.dom.MutationScope mutation = getDocument().beginMutation()) {
+            ((com.cleanroommc.modularui.api.dom.MuiElement) parent).replaceChild(replacement, currentRoot);
+            mutation.commit();
+        }
+        return replacement;
+    }
+
+    public MuiScreenDocumentController getDocumentController() {
+        return this.documentController;
+    }
+
+    /** Opens the optional client-local DOM/CSS inspector backend for this screen. */
+    public MuiDevToolsSession openDevTools() {
+        return this.documentController.openDevTools();
+    }
+
+    public MuiElementRegistry getElementRegistry() {
+        return this.documentController.getElementRegistry();
+    }
+
+    public void adoptWidgetTree() {
+        this.documentController.adoptWidgetTree();
+    }
+
+    public InputDispatchMode getInputDispatchMode() {
+        return this.inputDispatchMode;
+    }
+
+    public void setInputDispatchMode(InputDispatchMode inputDispatchMode) {
+        this.inputDispatchMode = Objects.requireNonNull(inputDispatchMode, "inputDispatchMode");
     }
 
     public ModularSyncManager getSyncManager() {

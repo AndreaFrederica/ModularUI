@@ -1,6 +1,7 @@
 package com.cleanroommc.modularui.screen.navigation;
 
 import com.cleanroommc.modularui.api.navigation.INavigationActionHandler;
+import com.cleanroommc.modularui.api.event.ActionEvent;
 import com.cleanroommc.modularui.api.navigation.NavigationAction;
 import com.cleanroommc.modularui.api.navigation.NavigationActionResult;
 import com.cleanroommc.modularui.api.navigation.NavigationInfo;
@@ -9,6 +10,7 @@ import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.api.widget.Interactable;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.ModularScreen;
+import com.cleanroommc.modularui.screen.event.InputDispatchMode;
 import com.cleanroommc.modularui.screen.viewport.LocatedWidget;
 
 import java.util.Objects;
@@ -33,6 +35,17 @@ public final class ModularNavigationDispatcher {
         if (target.getPanel() != screen.getPanelManager().getTopMostPanel()) return NavigationActionResult.REJECTED;
         NavigationInfo info = target.getNavigationInfo();
         if (!info.getActions().contains(action)) return NavigationActionResult.REJECTED;
+
+        if (screen.getInputDispatchMode() != InputDispatchMode.LEGACY) {
+            if (!screen.getEventDispatcher().dispatch(target, new ActionEvent(action))) {
+                return NavigationActionResult.HANDLED;
+            }
+            if (screen.getInputDispatchMode() == InputDispatchMode.DOM) {
+                return NavigationActionResult.IGNORED;
+            }
+            if (!target.isValid() || target.getScreen() != screen) return NavigationActionResult.STALE;
+            if (!target.isEnabled() || !target.areAncestorsEnabled()) return NavigationActionResult.REJECTED;
+        }
 
         if (target instanceof INavigationActionHandler) {
             NavigationActionResult semantic = ((INavigationActionHandler) target).onNavigationAction(action);

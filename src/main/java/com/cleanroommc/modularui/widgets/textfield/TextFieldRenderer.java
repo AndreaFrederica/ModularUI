@@ -106,16 +106,17 @@ public class TextFieldRenderer extends TextRenderer {
         if (line.getWidth() < x) return new Point(line.getText().length(), index);
         float currentX = 0;
         for (int i = 0; i < line.getText().length(); i++) {
-            char c = line.getText().charAt(i);
-            float charWidth = getFontRenderer().getCharWidth(c) * this.scale;
-            currentX += charWidth;
-            if (currentX >= x) {
-                // dist with current letter < dist without current letter -> next letter pos
-                if (Math.abs(currentX - x) < Math.abs(currentX - charWidth - x)) i++;
-                return new Point(i, index);
+            // Measure both sides of each boundary. NFR glyph advances are fractional,
+            // while FontRenderer#getCharWidth rounds every glyph independently.
+            String prefix = line.getText().substring(0, i + 1);
+            float nextX = measureText(prefix);
+            if (nextX >= x) {
+                float previousX = currentX;
+                return new Point(Math.abs(nextX - x) < Math.abs(previousX - x) ? i + 1 : i, index);
             }
+            currentX = nextX;
         }
-        return new Point();
+        return new Point(line.getText().length(), index);
     }
 
     public Point2D.Float getPosOf(List<Line> measuredLines, Point cursorPos) {
@@ -124,7 +125,7 @@ public class TextFieldRenderer extends TextRenderer {
         }
         Line line = measuredLines.get(cursorPos.y);
         String sub = line.getText().substring(0, Math.min(line.getText().length(), cursorPos.x));
-        return new Point2D.Float(getStartX(line.getWidth()) + getFontRenderer().getStringWidth(sub) * this.scale, getStartYOfLines(measuredLines.size()) + cursorPos.y * getFontHeight());
+        return new Point2D.Float(getStartX(line.getWidth()) + measureText(sub), getStartYOfLines(measuredLines.size()) + cursorPos.y * getFontHeight());
     }
 
     @SideOnly(Side.CLIENT)

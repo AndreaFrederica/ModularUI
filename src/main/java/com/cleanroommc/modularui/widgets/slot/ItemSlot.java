@@ -50,6 +50,7 @@ public class ItemSlot extends Widget<ItemSlot> implements IVanillaSlot, Interact
 
     private ItemSlotSH syncHandler;
     private RichTooltip tooltip;
+    private boolean domMounted = true;
 
     public ItemSlot() {
         itemTooltip().setAutoUpdate(true);//.setHasTitleMargin(true);
@@ -83,7 +84,7 @@ public class ItemSlot extends Widget<ItemSlot> implements IVanillaSlot, Interact
     @Override
     public void onUpdate() {
         super.onUpdate();
-        boolean shouldBeEnabled = areAncestorsEnabled();
+        boolean shouldBeEnabled = this.domMounted && areAncestorsEnabled();
         if (shouldBeEnabled != getSlot().isEnabled()) {
             this.syncHandler.setEnabled(shouldBeEnabled, true);
         }
@@ -182,6 +183,29 @@ public class ItemSlot extends Widget<ItemSlot> implements IVanillaSlot, Interact
             throw new IllegalStateException("Widget is not initialised!");
         }
         return this.syncHandler;
+    }
+
+    /** Keeps the fixed container slot registered while its DOM view is detached or remounted. */
+    @org.jetbrains.annotations.ApiStatus.Internal
+    public void onDomMountChanged(boolean mounted) {
+        if (this.domMounted == mounted) return;
+        this.domMounted = mounted;
+        if (this.syncHandler != null && this.syncHandler.isValid()) {
+            boolean enabled = mounted && isValid() && areAncestorsEnabled();
+            if (enabled != getSlot().isEnabled()) this.syncHandler.setEnabled(enabled, true);
+        }
+    }
+
+    @org.jetbrains.annotations.ApiStatus.Internal
+    public boolean isDomMounted() {
+        return this.domMounted;
+    }
+
+    @org.jetbrains.annotations.ApiStatus.Internal
+    public void refreshDomEnabledState() {
+        if (this.syncHandler == null || !this.syncHandler.isValid()) return;
+        boolean enabled = this.domMounted && isValid() && areAncestorsEnabled();
+        if (enabled != getSlot().isEnabled()) this.syncHandler.setEnabled(enabled, true);
     }
 
     public RichTooltip getItemTooltip() {

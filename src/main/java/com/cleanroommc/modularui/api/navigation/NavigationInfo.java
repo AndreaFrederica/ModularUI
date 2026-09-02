@@ -88,6 +88,30 @@ public final class NavigationInfo {
         return this.trapFocus;
     }
 
+    /** Returns a copy with only the focusability flag changed. */
+    public NavigationInfo withFocusable(boolean focusable) {
+        return copyBuilder().focusable(focusable).build();
+    }
+
+    /** Returns a copy with only the navigation order changed. */
+    public NavigationInfo withOrder(int order) {
+        return copyBuilder().order(order).build();
+    }
+
+    private Builder copyBuilder() {
+        return builder(this.role)
+                .id(this.id)
+                .label(this.label)
+                .actions(this.actions.toArray(new NavigationAction[0]))
+                .group(this.group)
+                .order(this.order)
+                .primaryAxis(this.primaryAxis)
+                .focusable(this.focusable)
+                .wrapHorizontal(this.wrapHorizontal)
+                .wrapVertical(this.wrapVertical)
+                .trapFocus(this.trapFocus);
+    }
+
     public static final class Builder {
 
         @Nullable private String id;

@@ -4,6 +4,7 @@ import com.cleanroommc.modularui.ModularUIConfig;
 import com.cleanroommc.modularui.api.value.IDoubleValue;
 import com.cleanroommc.modularui.api.value.ISyncOrValue;
 import com.cleanroommc.modularui.drawable.UITexture;
+import com.cleanroommc.modularui.drawable.Rectangle;
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext;
 import com.cleanroommc.modularui.theme.WidgetTheme;
 import com.cleanroommc.modularui.theme.WidgetThemeEntry;
@@ -24,6 +25,9 @@ public class ProgressWidget extends Widget<ProgressWidget> {
     private UITexture emptyTexture;
     private Direction direction = Direction.RIGHT;
     private int imageSize = -1;
+    private boolean cssBar;
+    private int cssTrackColor = 0xff202832;
+    private int cssFillColor = 0xff38bda6;
 
     private IDoubleValue<?> doubleValue;
 
@@ -67,6 +71,10 @@ public class ProgressWidget extends Widget<ProgressWidget> {
     @Override
     public void draw(ModularGuiContext context, WidgetThemeEntry<?> entry) {
         WidgetTheme widgetTheme = getActiveWidgetTheme(entry, isHovering());
+        if (this.cssBar) {
+            drawCssBar(context, widgetTheme);
+            return;
+        }
         if (this.emptyTexture != null) {
             this.emptyTexture.draw(context, 0, 0, getArea().w(), getArea().h(), widgetTheme);
             Color.setGlColorOpaque(Color.WHITE.main);
@@ -107,6 +115,38 @@ public class ProgressWidget extends Widget<ProgressWidget> {
             }
         }
     }
+
+    private void drawCssBar(ModularGuiContext context, WidgetTheme widgetTheme) {
+        int width = getArea().w();
+        int height = getArea().h();
+        new Rectangle().color(this.cssTrackColor).cornerRadius(Math.min(3, Math.min(width, height) / 2))
+                .drawAtZero(context, width, height, widgetTheme);
+        float progress = MathUtils.clamp(getCurrentProgress(), 0f, 1f);
+        if (progress <= 0f) return;
+        if (this.direction == Direction.UP || this.direction == Direction.DOWN) {
+            int filledHeight = Math.max(1, Math.round(height * progress));
+            int y = this.direction == Direction.UP ? height - filledHeight : 0;
+            new Rectangle().color(this.cssFillColor).cornerRadius(Math.min(3, Math.min(width, filledHeight) / 2))
+                    .draw(context, 0, y, width, filledHeight, widgetTheme);
+        } else {
+            int filledWidth = Math.max(1, Math.round(width * progress));
+            int x = this.direction == Direction.LEFT ? width - filledWidth : 0;
+            new Rectangle().color(this.cssFillColor).cornerRadius(Math.min(3, Math.min(filledWidth, height) / 2))
+                    .draw(context, x, 0, filledWidth, height, widgetTheme);
+        }
+    }
+
+    public ProgressWidget cssBar(int trackColor, int fillColor) {
+        this.cssBar = true;
+        this.cssTrackColor = trackColor;
+        this.cssFillColor = fillColor;
+        return this;
+    }
+
+    public ProgressWidget clearCssBar() { this.cssBar = false; return this; }
+    public boolean isCssBar() { return this.cssBar; }
+    public int getCssTrackColor() { return this.cssTrackColor; }
+    public int getCssFillColor() { return this.cssFillColor; }
 
     public float getProgressUV(float uv) {
         if (ModularUIConfig.smoothProgressBar) {

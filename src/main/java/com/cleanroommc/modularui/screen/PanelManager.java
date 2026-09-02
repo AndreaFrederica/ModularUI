@@ -41,7 +41,10 @@ public class PanelManager {
     private final ReverseIterable<ModularPanel> reversePanels = new ReverseIterable<>(this.panelsView);
     private final ObjectList<ModularPanel> disposal = ObjectList.create(DISPOSAL_CAPACITY);
     private final Map<String, IPanelHandler> panelHandlerMap = new Object2ObjectOpenHashMap<>();
-    private boolean cantDisposeNow = false;
+    private int safeDepth = 0;
+    private int uiMutationBatchDepth = 0;
+    private boolean batchedStructureDirty;
+    private boolean batchedGeometryDirty;
     private boolean dirty = false;
     private long navigationStructureRevision = 1L;
     private long navigationGeometryRevision = 1L;
@@ -101,6 +104,7 @@ public class PanelManager {
         this.dirty = true;
         markNavigationStructureDirty();
         panel.onOpen(this.screen);
+        this.screen.getDocumentController().adoptPanel(panel);
         if (resize) {
             WidgetTree.resizeInternal(panel.resizer(), true);
         }
@@ -148,6 +152,17 @@ public class PanelManager {
             }
         }
         return null;
+    }
+
+    /** Resolves the unique pointer target while preserving modal panel interaction rules. */
+    @ApiStatus.Internal
+    public @Nullable IWidget getTopInteractionTarget() {
+        for (ModularPanel panel : this.panels) {
+            IWidget widget = panel.getTopHovering();
+            if (widget != null) return widget;
+            if (panel.disablePanelsBelow()) return panel;
+        }
+        return this.panels.isEmpty() ? null : this.panels.getFirst();
     }
 
     @Nullable
@@ -245,7 +260,9 @@ public class PanelManager {
         if (panel.isOpen()) panel.onClose();
         if (!this.disposal.contains(panel)) {
             if (this.disposal.size() == DISPOSAL_CAPACITY) {
-                this.disposal.removeFirst().dispose();
+                ModularPanel disposed = this.disposal.removeFirst();
+                disposed.dispose();
+                this.screen.getDocumentController().onPanelDisposed(disposed);
             }
             this.disposal.addLast(panel);
         }
@@ -253,14 +270,16 @@ public class PanelManager {
 
     public <T> T doSafe(Supplier<T> runnable) {
         if (isDisposed()) return null;
-        this.cantDisposeNow = true;
-        T t = runnable.get();
-        this.cantDisposeNow = false;
-        if (this.state == State.WAIT_DISPOSAL) {
-            setState(State.CLOSED);
-            dispose();
+        this.safeDepth++;
+        try {
+            return runnable.get();
+        } finally {
+            this.safeDepth--;
+            if (this.safeDepth == 0 && this.state == State.WAIT_DISPOSAL) {
+                setState(State.CLOSED);
+                dispose();
+            }
         }
-        return t;
     }
 
     @ApiStatus.Internal
@@ -269,7 +288,7 @@ public class PanelManager {
         if (this.state != State.CLOSED && this.state != State.WAIT_DISPOSAL) {
             throw new IllegalStateException("Must close screen first before disposing!");
         }
-        if (this.cantDisposeNow) {
+        if (this.safeDepth > 0) {
             setState(State.WAIT_DISPOSAL);
             return;
         }
@@ -277,6 +296,7 @@ public class PanelManager {
         this.panels.forEach(this::finalizePanel);
         setState(State.CLOSED);
         this.disposal.forEach(ModularPanel::dispose);
+        this.screen.getDocumentController().close();
         this.disposal.clear();
         this.panels.clear();
         this.panelsClone.clear();
@@ -437,12 +457,36 @@ public class PanelManager {
     }
 
     public void markNavigationStructureDirty() {
+        if (this.uiMutationBatchDepth > 0) {
+            this.batchedStructureDirty = true;
+            this.batchedGeometryDirty = true;
+            return;
+        }
         this.navigationStructureRevision++;
         this.navigationGeometryRevision++;
     }
 
     public void markNavigationGeometryDirty() {
+        if (this.uiMutationBatchDepth > 0) {
+            this.batchedGeometryDirty = true;
+            return;
+        }
         this.navigationGeometryRevision++;
+    }
+
+    @ApiStatus.Internal
+    public void beginUiMutationBatch() {
+        this.uiMutationBatchDepth++;
+    }
+
+    @ApiStatus.Internal
+    public void endUiMutationBatch() {
+        if (this.uiMutationBatchDepth <= 0) throw new IllegalStateException("No UI mutation batch is active");
+        if (--this.uiMutationBatchDepth != 0) return;
+        if (this.batchedStructureDirty) this.navigationStructureRevision++;
+        if (this.batchedGeometryDirty) this.navigationGeometryRevision++;
+        this.batchedStructureDirty = false;
+        this.batchedGeometryDirty = false;
     }
 
     private void setState(State state) {

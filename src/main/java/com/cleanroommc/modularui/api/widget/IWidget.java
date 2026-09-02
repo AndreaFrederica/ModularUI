@@ -2,6 +2,8 @@ package com.cleanroommc.modularui.api.widget;
 
 import com.cleanroommc.modularui.api.ITheme;
 import com.cleanroommc.modularui.api.ITreeNode;
+import com.cleanroommc.modularui.api.event.IEventTarget;
+import com.cleanroommc.modularui.api.dom.NodeHandle;
 import com.cleanroommc.modularui.api.layout.IViewportStack;
 import com.cleanroommc.modularui.api.navigation.INavigationElement;
 import com.cleanroommc.modularui.api.navigation.NavigationInfo;
@@ -24,7 +26,16 @@ import java.util.function.Consumer;
 /**
  * A widget in a Gui.
  */
-public interface IWidget extends IGuiElement, ITreeNode<IWidget>, INavigationElement {
+public interface IWidget extends IGuiElement, ITreeNode<IWidget>, INavigationElement, IEventTarget {
+
+    @Override
+    default IEventTarget getEventParent() {
+        return isValid() ? getParent() : null;
+    }
+
+    default NodeHandle getNodeHandle() {
+        return isValid() ? getScreen().getDocumentController().getNodeHandle(this) : NodeHandle.EMPTY;
+    }
 
     @Override
     default NavigationInfo getNavigationInfo() {

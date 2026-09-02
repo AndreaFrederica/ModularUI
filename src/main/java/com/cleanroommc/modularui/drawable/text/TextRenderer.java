@@ -1,6 +1,7 @@
 package com.cleanroommc.modularui.drawable.text;
 
 import com.cleanroommc.modularui.api.drawable.ITextLine;
+import com.cleanroommc.modularui.api.text.MuiTextBackends;
 import com.cleanroommc.modularui.drawable.Stencil;
 import com.cleanroommc.modularui.screen.viewport.GuiContext;
 import com.cleanroommc.modularui.utils.Alignment;
@@ -99,7 +100,7 @@ public class TextRenderer {
     }
 
     public void drawSimple(String text) {
-        float w = getFontRenderer().getStringWidth(text) * this.scale;
+        float w = measureText(text);
         int y = getStartYOfLines(1), x = getStartX(w);
         draw(text, x, y);
         this.lastActualWidth = w;
@@ -309,7 +310,13 @@ public class TextRenderer {
     }
 
     public Line line(String text) {
-        return new Line(text, getFontRenderer().getStringWidth(text) * this.scale);
+        return new Line(text, measureText(text));
+    }
+
+    /** Measures text in the same screen-space units used by the renderer. */
+    protected float measureText(String text) {
+        float measured = MuiTextBackends.measure(text, this.scale, this.color, this.shadow);
+        return Float.isNaN(measured) ? getFontRenderer().getStringWidth(text) * this.scale : measured;
     }
 
     public static class Line {

@@ -1,6 +1,7 @@
 package com.cleanroommc.modularui.widget;
 
 import com.cleanroommc.modularui.api.UpOrDown;
+import com.cleanroommc.modularui.api.GuiAxis;
 import com.cleanroommc.modularui.api.layout.IViewport;
 import com.cleanroommc.modularui.api.layout.IViewportStack;
 import com.cleanroommc.modularui.api.widget.IGuiAction;
@@ -88,6 +89,14 @@ public abstract class AbstractScrollWidget<I extends IWidget, W extends Abstract
 
     public ScrollArea getScrollArea() {
         return this.scroll;
+    }
+
+    /**
+     * Specialized widgets can mark an axis as required by their layout code.
+     * Style adapters must not remove such an axis when applying overflow.
+     */
+    public boolean isScrollAxisRequired(GuiAxis axis) {
+        return false;
     }
 
     @Override

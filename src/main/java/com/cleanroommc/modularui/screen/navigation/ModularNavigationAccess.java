@@ -5,6 +5,7 @@ import com.cleanroommc.modularui.api.navigation.NavigationInfo;
 import com.cleanroommc.modularui.api.navigation.NavigationRole;
 import com.cleanroommc.modularui.api.navigation.NavigationTreeEntry;
 import com.cleanroommc.modularui.api.navigation.NavigationTreeView;
+import com.cleanroommc.modularui.api.navigation.NavigationTargetHandle;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.ModularScreen;
@@ -31,6 +32,20 @@ public final class ModularNavigationAccess {
         NavigationTreeEntry entry = capture(screen).getEntry(path);
         if (entry == null) return com.cleanroommc.modularui.api.navigation.NavigationActionResult.STALE;
         return ModularNavigationDispatcher.perform(screen, entry.getWidget(), action);
+    }
+
+    public static com.cleanroommc.modularui.api.navigation.NavigationActionResult perform(
+            ModularScreen screen, NavigationTargetHandle target,
+            com.cleanroommc.modularui.api.navigation.NavigationAction action) {
+        Objects.requireNonNull(screen, "screen");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(action, "action");
+        if (target.hasDomIdentity()) {
+            IWidget widget = screen.getDocumentController().resolveWidget(target.getNodeHandle());
+            if (widget == null) return com.cleanroommc.modularui.api.navigation.NavigationActionResult.STALE;
+            return ModularNavigationDispatcher.perform(screen, widget, action);
+        }
+        return perform(screen, target.getLegacyPath(), action);
     }
 
     public static boolean reveal(ModularScreen screen, IWidget target) {
@@ -75,7 +90,8 @@ public final class ModularNavigationAccess {
 
         NavigationGeometry geometry = ModularNavigationGeometry.locate(screen, widget);
         entries.add(new NavigationTreeEntry(path, parentPath, childPaths, widget, info, geometry,
-                widget.isEnabled() && widget.areAncestorsEnabled()));
+                widget.isEnabled() && widget.areAncestorsEnabled(),
+                new NavigationTargetHandle(path, widget.getNodeHandle())));
     }
 
     private static String segment(IWidget widget, int index) {

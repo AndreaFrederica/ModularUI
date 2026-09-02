@@ -93,8 +93,7 @@ public class SortableListWidget<T> extends ListValueWidget<T, SortableListWidget
             ModularUI.LOGGER.error("Failed to move element from {} to {}", from, to);
             return;
         }
-        SortableListWidget.Item<?> child = getTypeChildren().remove(from);
-        getChildren().add(to, child);
+        if (!move(from, to)) return;
         if (isValid()) {
             assignIndexes();
             this.scheduleAnimation = true;
@@ -107,13 +106,16 @@ public class SortableListWidget<T> extends ListValueWidget<T, SortableListWidget
     }
 
     @Override
+    public boolean supportsDomChildMutations() {
+        return false;
+    }
+
+    @Override
     public boolean remove(int index) {
-        Item<T> widget = getTypeChildren().remove(index);
-        if (widget != null) {
-            widget.dispose();
+        Item<T> widget = getTypeChildren().get(index);
+        if (super.remove(index)) {
             assignIndexes();
             this.scheduleAnimation = true;
-            onChildRemove(widget);
             if (this.onChange != null) {
                 this.onChange.accept(getValues());
             }

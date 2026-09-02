@@ -37,4 +37,8 @@ public class SyncedAction {
     public boolean isExecute(boolean client) {
         return (client && this.executeClient) || (!client && this.executeServer);
     }
+
+    boolean matches(ISyncedAction action, boolean executeClient, boolean executeServer) {
+        return this.action == action && this.executeClient == executeClient && this.executeServer == executeServer;
+    }
 }

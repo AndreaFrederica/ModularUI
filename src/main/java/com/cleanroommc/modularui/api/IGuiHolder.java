@@ -2,6 +2,7 @@ package com.cleanroommc.modularui.api;
 
 import com.cleanroommc.modularui.ModularUI;
 import com.cleanroommc.modularui.factory.GuiData;
+import com.cleanroommc.modularui.api.sync.MuiProtocolTemplate;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.cleanroommc.modularui.screen.UISettings;
@@ -10,11 +11,21 @@ import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
  * An interface to implement on {@link net.minecraft.tileentity.TileEntity} or {@link net.minecraft.item.Item}.
  */
 @FunctionalInterface
 public interface IGuiHolder<T extends GuiData> {
+
+    /**
+     * Optional fixed protocol for this holder. The factory asks for it on both sides before
+     * {@link #buildUI(GuiData, PanelSyncManager, UISettings)} is called.
+     */
+    default @Nullable MuiProtocolTemplate getProtocolTemplate(T data) {
+        return null;
+    }
 
     /**
      * Only called on client side.

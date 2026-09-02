@@ -3,6 +3,7 @@ package com.cleanroommc.modularui.api;
 import com.cleanroommc.modularui.factory.GuiData;
 import com.cleanroommc.modularui.screen.*;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.cleanroommc.modularui.api.sync.MuiProtocolTemplate;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.network.PacketBuffer;
@@ -11,6 +12,7 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * An interface for UI factories. They are responsible for opening synced GUIs and syncing necessary data.
@@ -27,6 +29,14 @@ public interface UIFactory<D extends GuiData> {
      */
     @NotNull
     String getFactoryName();
+
+    /**
+     * Optional fixed client/server protocol template. Returning non-null disables implicit BFS auto-sync for this UI.
+     * The returned plan and wire type registry must be derived from common mod-owned resources.
+     */
+    default @Nullable MuiProtocolTemplate getProtocolTemplate(D guiData) {
+        return null;
+    }
 
     /**
      * Creates the main panel for the GUI. Is called on client and server side.

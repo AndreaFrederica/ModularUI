@@ -7,6 +7,12 @@ import com.cleanroommc.modularui.network.ModularNetwork;
 import com.cleanroommc.modularui.screen.ModularContainer;
 import com.cleanroommc.modularui.widgets.slot.ModularSlot;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
+import com.cleanroommc.modularui.api.sync.DocumentSyncLimits;
+import com.cleanroommc.modularui.api.sync.document.DocumentEndpointCatalog;
+import com.cleanroommc.modularui.api.sync.MuiProtocolEntry;
+import com.cleanroommc.modularui.api.sync.MuiProtocolInstallation;
+import com.cleanroommc.modularui.api.sync.MuiProtocolAction;
+import com.cleanroommc.modularui.value.sync.document.DocumentSyncHandler;
 
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
@@ -181,6 +187,11 @@ public class PanelSyncManager implements ISyncRegistrar<PanelSyncManager> {
             }
         }
         String key = makeSyncKey(name, id);
+        SyncHandler handlerAtKey = this.syncHandlers.get(key);
+        if (handlerAtKey != null && handlerAtKey != syncHandler) {
+            throw new IllegalStateException("Failed to register SyncHandler for key '" + key + "'. " +
+                    "The key is already used by " + handlerAtKey.getClass().getName() + ".");
+        }
         String currentKey = this.reverseSyncHandlers.get(syncHandler);
         if (currentKey != null) {
             if (!currentKey.equals(key)) {
@@ -207,6 +218,51 @@ public class PanelSyncManager implements ISyncRegistrar<PanelSyncManager> {
         Objects.requireNonNull(syncHandler, "Sync Handler must not be null");
         putSyncValue(name, id, syncHandler);
         return this;
+    }
+
+    /** Registers or resolves the one fixed handler used by a dynamic client document. */
+    public DocumentSyncHandler documentChannel(String key, DocumentEndpointCatalog serverCatalog,
+                                               DocumentSyncLimits limits) {
+        Objects.requireNonNull(limits, "limits");
+        return getOrCreateSyncHandler(key, 0, DocumentSyncHandler.class, () -> this.client
+                ? DocumentSyncHandler.client(limits)
+                : DocumentSyncHandler.server(Objects.requireNonNull(serverCatalog,
+                        "A server endpoint catalog is required on the server"), limits));
+    }
+
+    /** Verifies that a fixed template installed exactly the handlers/actions declared by its plan. */
+    @ApiStatus.Internal
+    public void verifyProtocolInstallation(MuiProtocolInstallation installation) {
+        Objects.requireNonNull(installation, "installation");
+        if (!installation.isComplete()) throw new IllegalStateException("Protocol installation is incomplete");
+        int expectedHandlers = 0;
+        int expectedActions = 0;
+        for (MuiProtocolEntry entry : installation.getPlan().getEntries()) {
+            if (entry.getKind() == MuiProtocolEntry.Kind.ACTION) {
+                expectedActions++;
+                MuiProtocolAction action = installation.getAction(entry.getKey());
+                SyncedAction registered = this.syncedActions.get(entry.getKey());
+                if (registered == null || !registered.matches(action.getAction(),
+                        action.isExecuteClient(), action.isExecuteServer())) {
+                    throw new IllegalStateException("Protocol action is missing or was replaced: " + entry.getKey());
+                }
+            } else {
+                expectedHandlers++;
+                SyncHandler expected = entry.getKind() == MuiProtocolEntry.Kind.SLOT
+                        ? installation.getSlot(entry.getKey(), entry.getNumericId())
+                        : installation.getHandler(entry.getKey(), entry.getNumericId());
+                String mapKey = makeSyncKey(entry.getKey(), entry.getNumericId());
+                if (this.syncHandlers.get(mapKey) != expected) {
+                    throw new IllegalStateException("Protocol sync handler is missing or was replaced: " + mapKey);
+                }
+            }
+        }
+        if (this.syncHandlers.size() != expectedHandlers) {
+            throw new IllegalStateException("Fixed protocol UI registered undeclared sync handlers");
+        }
+        if (this.syncedActions.size() != expectedActions) {
+            throw new IllegalStateException("Fixed protocol UI registered undeclared synced actions");
+        }
     }
 
     /**
@@ -307,7 +363,17 @@ public class PanelSyncManager implements ISyncRegistrar<PanelSyncManager> {
 
     @Override
     public PanelSyncManager registerSyncedAction(String mapKey, boolean executeClient, boolean executeServer, ISyncedAction action) {
+        Objects.requireNonNull(mapKey, "Map key must not be null");
         if (executeClient || executeServer) {
+            Objects.requireNonNull(action, "Synced action must not be null");
+            SyncedAction current = this.syncedActions.get(mapKey);
+            if (current != null) {
+                if (current.matches(action, executeClient, executeServer)) {
+                    return this;
+                }
+                throw new IllegalStateException("Failed to register synced action for key '" + mapKey +
+                        "'. The key is already in use.");
+            }
             this.syncedActions.put(mapKey, new SyncedAction(action, executeClient, executeServer));
         }
         return this;

@@ -2,6 +2,7 @@ package com.cleanroommc.modularui.overlay;
 
 import com.cleanroommc.modularui.ModularUI;
 import com.cleanroommc.modularui.api.IMuiScreen;
+import com.cleanroommc.modularui.api.IPanelHandler;
 import com.cleanroommc.modularui.api.drawable.IIcon;
 import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.api.value.IBoolValue;
@@ -28,6 +29,7 @@ public class DebugOverlay extends CustomModularScreen {
     private static final IIcon CHECKMARK = GuiTextures.CHECKMARK.asIcon().size(8);
 
     private final IMuiScreen parent;
+    private IPanelHandler devToolsHandler;
 
     public DebugOverlay(IMuiScreen screen) {
         super(ModularUI.ID);
@@ -36,8 +38,10 @@ public class DebugOverlay extends CustomModularScreen {
 
     @Override
     public @NotNull ModularPanel buildUI(ModularGuiContext context) {
-        return new ModularPanel("debug")
-                .fullScreenInvisible()
+        ModularPanel debugPanel = new ModularPanel("debug").fullScreenInvisible();
+        this.devToolsHandler = IPanelHandler.simple(debugPanel,
+                (parentPanel, player) -> new DevToolsPanel(this.parent), true);
+        return debugPanel
                 .child(new ContextMenuButton<>("menu_debug_options")
                         .horizontalCenter()
                         .bottom(0)
@@ -65,6 +69,15 @@ public class DebugOverlay extends CustomModularScreen {
                                         .onMousePressed(b -> {
                                             TreeUtil.print(parent.getScreen().getResizeNode());
                                             return true;
+                                        }))
+                                .child(new ButtonWidget<>().name("open_devtools_button")
+                                        .height(12)
+                                        .widthRel(1f)
+                                        .invisible()
+                                        .overlay(IKey.str("Open DevTools"))
+                                        .onMousePressed(b -> {
+                                            if (b == 0 && this.devToolsHandler != null) this.devToolsHandler.openPanel();
+                                            return b == 0;
                                         }))
                                 .child(new ContextMenuButton<>("menu_hover_info")
                                         .height(10)

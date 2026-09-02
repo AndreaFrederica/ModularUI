@@ -140,6 +140,12 @@ public abstract class ScrollData {
         this.cancelScrollEdge = cancelScrollEdge;
     }
 
+    /** Returns the optional drawable used for this axis' scrollbar. */
+    @Nullable
+    public IDrawable getScrollbarTexture() {
+        return this.scrollbar;
+    }
+
     protected final int getRawVisibleSize(ScrollArea area) {
         // the scroll area doesn't contribute to the visible size in this case
         return Math.max(0, getRawFullVisibleSize(area) - area.getPadding().getTotal(this.axis) + area.getScrollPadding().getTotalScrollPadding(this.axis));

@@ -4,6 +4,7 @@ import com.cleanroommc.modularui.api.widget.IDelegatingWidget;
 import com.cleanroommc.modularui.api.widget.INotifyEnabled;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.api.widget.Interactable;
+import com.cleanroommc.modularui.screen.event.EventListenerRegistry;
 import com.cleanroommc.modularui.api.navigation.NavigationAction;
 import com.cleanroommc.modularui.api.navigation.INavigationElement;
 import com.cleanroommc.modularui.api.navigation.NavigationInfo;
@@ -107,6 +108,16 @@ public abstract class AbstractWidget implements IWidget, INavigationElement {
 
     void onInitInternal(boolean late) {}
 
+    @ApiStatus.Internal
+    public final void reparentInternal(@NotNull IWidget parent) {
+        if (!this.valid) throw new IllegalStateException("Only mounted widgets can be reparented");
+        this.parent = Objects.requireNonNull(parent, "parent");
+        this.panel = parent.getPanel();
+        this.context = parent.getContext();
+        getArea().z(parent.getArea().z() + 1);
+        this.resizer.initialize(parent.resizer(), parent.getScreen().getResizeNode());
+    }
+
     /**
      * Called after this widget is initialised and before the children are initialised.
      */
@@ -130,6 +141,15 @@ public abstract class AbstractWidget implements IWidget, INavigationElement {
             for (IWidget child : getChildren()) {
                 child.dispose();
             }
+        }
+        if (this.valid) {
+            try {
+                getScreen().getEventDispatcher().clearTarget(this);
+            } finally {
+                EventListenerRegistry.clear(this);
+            }
+        } else {
+            EventListenerRegistry.clear(this);
         }
         if (!(this instanceof ModularPanel)) {
             this.panel = null;
@@ -339,11 +359,17 @@ public abstract class AbstractWidget implements IWidget, INavigationElement {
         return this.navigationInfo == null ? getDefaultNavigationInfo() : this.navigationInfo;
     }
 
+    /** Returns the explicit navigation override, excluding the class default. */
+    @Nullable
+    public final NavigationInfo getNavigationInfoOverride() {
+        return this.navigationInfo;
+    }
+
     protected NavigationInfo getDefaultNavigationInfo() {
         return this instanceof Interactable ? DEFAULT_INTERACTABLE_NAVIGATION : NavigationInfo.NONE;
     }
 
-    protected final void setNavigationInfo(@Nullable NavigationInfo navigationInfo) {
+    public final void setNavigationInfo(@Nullable NavigationInfo navigationInfo) {
         if (this.navigationInfo == navigationInfo) return;
         this.navigationInfo = navigationInfo;
         markNavigationStructureDirty();

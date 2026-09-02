@@ -97,9 +97,7 @@ public class MCHelper {
         if (!hasMc()) return Collections.emptyList();
         if (getMc().currentScreen != null) {
             List<String> tooltips = getMc().currentScreen.getItemToolTip(item);
-            if (!ModularUI.Mods.MODNAMETOOLTIP.isLoaded()) {
-                tooltips.add(ModularUIConfig.modNameFormat + getItemModName(item) + "§r");
-            }
+            appendItemModNameTooltip(tooltips, item);
 
             return tooltips;
         }
@@ -113,11 +111,48 @@ public class MCHelper {
             }
         }
 
-        if (!ModularUI.Mods.MODNAMETOOLTIP.isLoaded()) {
-            tooltips.add(ModularUIConfig.modNameFormat + getItemModName(item) + "§r");
-        }
+        appendItemModNameTooltip(tooltips, item);
 
         return tooltips;
+    }
+
+    /**
+     * Adds the fallback provenance line only when no compatible provider already owns it.
+     * UIE appends this line from ItemTooltipEvent, which runs before ModularUI builds a
+     * RichTooltip for an ItemSlot.
+     */
+    static void appendItemModNameTooltip(@NotNull List<String> tooltips, @NotNull ItemStack item) {
+        if (ModularUI.Mods.MODNAMETOOLTIP.isLoaded() || ModularUI.Mods.UIE.isLoaded()) return;
+
+        String modName = getItemModName(item);
+        if (modName == null || containsModNameLine(tooltips, modName)) return;
+        tooltips.add(ModularUIConfig.modNameFormat + modName + "§r");
+    }
+
+    static boolean containsModNameLine(@NotNull List<String> tooltips, @NotNull String modName) {
+        for (String line : tooltips) {
+            if (line != null && modName.equals(stripFormatting(line).trim())) return true;
+        }
+        return false;
+    }
+
+    private static String stripFormatting(String value) {
+        StringBuilder plain = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char current = value.charAt(i);
+            if (current == '\u00a7' && i + 1 < value.length() && isFormattingCode(value.charAt(i + 1))) {
+                i++;
+            } else {
+                plain.append(current);
+            }
+        }
+        return plain.toString();
+    }
+
+    private static boolean isFormattingCode(char value) {
+        char code = Character.toLowerCase(value);
+        return code >= '0' && code <= '9' || code >= 'a' && code <= 'f'
+                || code >= 'k' && code <= 'o' || code == 'r';
     }
 
     public static @Nullable String getItemModName(@NotNull ItemStack item) {

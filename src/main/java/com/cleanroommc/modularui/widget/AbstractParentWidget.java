@@ -7,9 +7,11 @@ import com.cleanroommc.modularui.theme.WidgetThemeEntry;
 import com.cleanroommc.modularui.widgets.VoidWidget;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.UnmodifiableView;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -21,11 +23,10 @@ import java.util.List;
 public class AbstractParentWidget<I extends IWidget, W extends AbstractParentWidget<I, W>> extends Widget<W> {
 
     private final List<I> children = new ArrayList<>();
+    private final List<I> childrenView = Collections.unmodifiableList(this.children);
 
     /**
-     * A list of all children of this widget. The list is modifiable contrary to the annotation.
-     * This just means that you shouldn't carelessly modify the list. Adding to the list also requires initialising the new child.
-     * Removing requires disposing the old child. Calling {@link #scheduleResize()} may also be expected.
+     * A read-only view of all children of this widget.
      *
      * @return a view of all children.
      */
@@ -34,20 +35,22 @@ public class AbstractParentWidget<I extends IWidget, W extends AbstractParentWid
     @NotNull
     @Override
     public List<IWidget> getChildren() {
-        return (List<IWidget>) this.children;
+        return (List<IWidget>) (List<?>) this.childrenView;
     }
 
     /**
-     * A list of all children of this widget with the given children type {@link I}. The list is modifiable contrary to the annotation.
-     * This just means that you shouldn't carelessly modify the list. Adding to the list also requires initialising the new child.
-     * Removing requires disposing the old child. Calling {@link #scheduleResize()} may also be expected.
+     * A read-only view of all children of this widget with the given children type {@link I}.
      *
      * @return a view of all children.
      */
     @UnmodifiableView
     @NotNull
     public List<I> getTypeChildren() {
-        return children;
+        return this.childrenView;
+    }
+
+    protected final List<I> mutableChildren() {
+        return this.children;
     }
 
     @Override
@@ -90,6 +93,7 @@ public class AbstractParentWidget<I extends IWidget, W extends AbstractParentWid
         }
         onChildAdd(child);
         markNavigationStructureDirty();
+        if (isValid()) getScreen().getDocumentController().onLegacyChildAdded(this, child, this.children.indexOf(child));
         return true;
     }
 
@@ -98,6 +102,7 @@ public class AbstractParentWidget<I extends IWidget, W extends AbstractParentWid
             if (isValid()) child.dispose();
             onChildRemove(child);
             markNavigationStructureDirty();
+            if (isValid()) getScreen().getDocumentController().onLegacyChildRemoved(this, child);
             return true;
         }
         return false;
@@ -111,18 +116,92 @@ public class AbstractParentWidget<I extends IWidget, W extends AbstractParentWid
         if (isValid()) child.dispose();
         onChildRemove(child);
         markNavigationStructureDirty();
+        if (isValid()) getScreen().getDocumentController().onLegacyChildRemoved(this, child);
         return true;
     }
 
     protected boolean removeAll() {
         if (this.children.isEmpty()) return false;
-        for (I i : this.children) {
+        List<I> removed = new ArrayList<>(this.children);
+        for (I i : removed) {
             if (isValid()) i.dispose();
             onChildRemove(i);
         }
         this.children.clear();
         markNavigationStructureDirty();
+        if (isValid()) {
+            for (I child : removed) getScreen().getDocumentController().onLegacyChildRemoved(this, child);
+        }
         return true;
+    }
+
+    protected boolean move(int from, int to) {
+        if (from < 0 || from >= this.children.size() || to < 0 || to >= this.children.size()) return false;
+        if (from == to) return true;
+        I child = this.children.remove(from);
+        this.children.add(to, child);
+        markNavigationStructureDirty();
+        if (isValid()) getScreen().getDocumentController().onLegacyChildMoved(this, child, to);
+        return true;
+    }
+
+    @ApiStatus.Internal
+    public boolean supportsDomChildMutations() {
+        return true;
+    }
+
+    @ApiStatus.Internal
+    public boolean canAcceptDomChild(IWidget child) {
+        return !getChildren().contains(child) && isDomChildTypeValid(child);
+    }
+
+    @ApiStatus.Internal
+    public boolean isDomChildTypeValid(IWidget child) {
+        if (child == null || child == this || child instanceof ModularPanel) return false;
+        try {
+            @SuppressWarnings("unchecked") I typedChild = (I) child;
+            return isChildValid(typedChild);
+        } catch (ClassCastException ignored) {
+            return false;
+        }
+    }
+
+    @ApiStatus.Internal
+    public void insertDomChild(IWidget child, int index) {
+        @SuppressWarnings("unchecked") I typedChild = (I) child;
+        if (!addChild(typedChild, index)) throw new IllegalStateException("Failed to insert DOM child");
+    }
+
+    @ApiStatus.Internal
+    public void removeDomChild(IWidget child) {
+        @SuppressWarnings("unchecked") I typedChild = (I) child;
+        if (!remove(typedChild)) throw new IllegalStateException("Failed to remove DOM child");
+    }
+
+    @ApiStatus.Internal
+    public void moveDomChild(int from, int to) {
+        if (!move(from, to)) throw new IllegalStateException("Failed to move DOM child");
+    }
+
+    @ApiStatus.Internal
+    public void detachDomChildForMove(IWidget child) {
+        @SuppressWarnings("unchecked") I typedChild = (I) child;
+        if (!this.children.remove(typedChild)) throw new IllegalStateException("Failed to detach DOM child");
+        onChildRemove(typedChild);
+        markNavigationStructureDirty();
+    }
+
+    @ApiStatus.Internal
+    public void attachMovedDomChild(IWidget child, int index) {
+        @SuppressWarnings("unchecked") I typedChild = (I) child;
+        this.children.add(index, typedChild);
+        if (typedChild instanceof AbstractWidget widget) {
+            widget.reparentInternal(this);
+        } else {
+            throw new IllegalStateException("A third-party IWidget cannot be reparented without remounting");
+        }
+        onChildAdd(typedChild);
+        markNavigationStructureDirty();
     }
 
     protected boolean isChildValid(I child) {

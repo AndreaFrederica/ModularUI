@@ -64,7 +64,9 @@ public class ModularUI {
         BOGOSORTER(ModIds.BOGOSORTER),
         JEI(ModIds.JEI),
         NEA(ModIds.NEA),
-        MODNAMETOOLTIP(ModIds.MODNAMETOOLTIP);
+        MODNAMETOOLTIP(ModIds.MODNAMETOOLTIP),
+        /** UIE provides the same item provenance tooltip line through ItemTooltipEvent. */
+        UIE(ModIds.UIE);
 
         public final String id;
         private boolean loaded = false;
@@ -100,5 +102,6 @@ public class ModularUI {
         public static final String NEA = "neverenoughanimations";
         public static final String BAUBLES = "baubles";
         public static final String MODNAMETOOLTIP = "modnametooltip";
+        public static final String UIE = "neofontrender_ui_enhancements";
     }
 }

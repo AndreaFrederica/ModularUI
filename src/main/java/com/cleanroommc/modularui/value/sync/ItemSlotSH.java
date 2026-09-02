@@ -46,6 +46,7 @@ public class ItemSlotSH extends SyncHandler {
     public void dispose() {
         super.dispose();
         this.slot.dispose();
+        this.registered = false;
     }
 
     @Override

@@ -7,6 +7,7 @@ import com.cleanroommc.modularui.api.IMuiScreen;
 import com.cleanroommc.modularui.api.ITheme;
 import com.cleanroommc.modularui.api.MCHelper;
 import com.cleanroommc.modularui.api.UpOrDown;
+import com.cleanroommc.modularui.api.event.InputModifiers;
 import com.cleanroommc.modularui.api.widget.IVanillaSlot;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.core.mixins.early.minecraft.GuiAccessor;
@@ -136,7 +137,7 @@ public class ClientScreenHandler {
         if (w == 0) return;
         UpOrDown upOrDown = w > 0 ? UpOrDown.UP : UpOrDown.DOWN;
         validateGui(event.getGui());
-        if (doAction(currentScreen, ms -> ms.onMouseScroll(upOrDown, Math.abs(w)))) {
+        if (doAction(currentScreen, ms -> ms.onMouseScroll(upOrDown, Math.abs(w), captureInputModifiers()))) {
             event.setCanceled(true);
         }
     }
@@ -280,7 +281,7 @@ public class ClientScreenHandler {
                     return RecipeViewerGhostHandler.checkRecipeViewerGhostDrag(muiScreen, button, drag);
                 }
             }
-            return doAction(muiScreen, ms -> ms.onMousePressed(button));
+            return doAction(muiScreen, ms -> ms.onMousePressed(button, captureInputModifiers()));
         }
         if (button != -1) {
             if (gameSettings.touchscreen) {
@@ -294,13 +295,13 @@ public class ClientScreenHandler {
             }
             acc.setEventButton(-1);
             if (muiScreen != null && muiScreen.onMouseInputPre(button, false)) return true;
-            return doAction(muiScreen, ms -> ms.onMouseRelease(button));
+            return doAction(muiScreen, ms -> ms.onMouseRelease(button, captureInputModifiers()));
         }
         if (acc.getEventButton() != -1 && acc.getLastMouseEvent() > 0L) {
             long l = Minecraft.getSystemTime() - acc.getLastMouseEvent();
-            return doAction(muiScreen, ms -> ms.onMouseDrag(acc.getEventButton(), l));
+            return doAction(muiScreen, ms -> ms.onMouseDrag(acc.getEventButton(), l, captureInputModifiers()));
         }
-        return false;
+        return doAction(muiScreen, ms -> ms.onPointerMove(captureInputModifiers()));
     }
 
     /**
@@ -325,14 +326,17 @@ public class ClientScreenHandler {
         if (state) {
             // pressing a key
             lastChar = c0;
-            return inputPhase.isEarly() ? doAction(muiScreen, ms -> ms.onKeyPressed(c0, key)) : keyTyped(mcScreen, c0, key);
+            return inputPhase.isEarly()
+                    ? doAction(muiScreen, ms -> ms.onKeyPressed(c0, key, captureInputModifiers()))
+                    : keyTyped(mcScreen, c0, key);
         } else {
             // releasing a key
             // for some reason when you press E after joining a world the button will not trigger the press event,
             // but only the release event, causing this to be null
             if (lastChar == null) return false;
             // when the key is released, the event char is empty
-            if (inputPhase.isEarly() && doAction(muiScreen, ms -> ms.onKeyRelease(lastChar, key))) {
+            if (inputPhase.isEarly()
+                    && doAction(muiScreen, ms -> ms.onKeyRelease(lastChar, key, captureInputModifiers()))) {
                 return true;
             }
             if (inputPhase.isLate() && key == 0 && c0 >= ' ') {
@@ -340,6 +344,11 @@ public class ClientScreenHandler {
             }
         }
         return false;
+    }
+
+    private static InputModifiers captureInputModifiers() {
+        return InputModifiers.of(GuiScreen.isShiftKeyDown(), GuiScreen.isCtrlKeyDown(),
+                GuiScreen.isAltKeyDown(), false);
     }
 
     private static boolean keyTyped(GuiScreen screen, char typedChar, int keyCode) throws IOException {

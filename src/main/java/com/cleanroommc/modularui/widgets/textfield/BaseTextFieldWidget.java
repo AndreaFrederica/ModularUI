@@ -1,10 +1,12 @@
 package com.cleanroommc.modularui.widgets.textfield;
 
 import com.cleanroommc.modularui.ModularUIConfig;
+import com.cleanroommc.modularui.api.GuiAxis;
 import com.cleanroommc.modularui.api.ITheme;
 import com.cleanroommc.modularui.api.widget.IFocusedWidget;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.api.widget.Interactable;
+import com.cleanroommc.modularui.api.IPanelHandler;
 import com.cleanroommc.modularui.api.navigation.INavigationActionHandler;
 import com.cleanroommc.modularui.api.navigation.NavigationAction;
 import com.cleanroommc.modularui.api.navigation.NavigationActionResult;
@@ -38,6 +40,11 @@ import java.util.regex.Pattern;
 public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends AbstractScrollWidget<VoidWidget, W>
         implements IFocusedWidget, INavigationActionHandler {
 
+    @Override
+    public boolean isScrollAxisRequired(GuiAxis axis) {
+        return axis == GuiAxis.X;
+    }
+
     private static final NavigationInfo DEFAULT_NAVIGATION = NavigationInfo.builder(NavigationRole.TEXT_INPUT)
             .actions(NavigationAction.ACTIVATE, NavigationAction.BEGIN_EDIT, NavigationAction.END_EDIT)
             .build();
@@ -63,8 +70,13 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
     protected int scrollOffset = 0;
     protected float scale = 1f;
     protected boolean focusOnGuiOpen;
+    private boolean editable = true;
     private int cursorTimer;
     protected long lastClickTime = 0;
+    /** Client-side context menu handler. The menu is rebuilt for every open so its enabled state reflects the current selection. */
+    private IPanelHandler contextMenuHandler;
+    private int contextMenuX;
+    private int contextMenuY;
 
     protected Integer textColor;
     protected Integer markedColor;
@@ -165,6 +177,23 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
         getScrollArea().getScrollX().setScrollSize(Math.max(0, (int) (this.renderer.getLastActualWidth() + 0.5f)));
     }
 
+    /** Returns a snapshot of the editable lines. Intended for client-side editor widgets. */
+    public List<String> getTextLines() {
+        return new ArrayList<>(this.handler.getText());
+    }
+
+    /** Replaces the editable text without creating a sync value. */
+    public void setTextLines(List<String> lines) {
+        this.handler.getText().clear();
+        if (lines == null || lines.isEmpty()) this.handler.getText().add("");
+        else this.handler.getText().addAll(lines);
+        // Do not call setCursor here: its scrollbar-centering path measures a
+        // single line but indexes it with the previous multi-line cursor row.
+        this.handler.getMainCursor().setLocation(0, 0);
+        this.handler.getOffsetCursor().setLocation(0, 0);
+        scheduleResize();
+    }
+
     @Override
     public WidgetThemeEntry<?> getWidgetThemeInternal(ITheme theme) {
         return theme.getTextFieldTheme();
@@ -200,7 +229,7 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
             return Result.IGNORE;
         }
         if (mouseButton == 1) {
-            this.handler.clear();
+            openContextMenu();
         } else {
             // the current transformation does not include the transformation of the children (the scroll) so we need to manually transform here
             int x = getContext().getMouseX() + getScrollX();
@@ -230,6 +259,25 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
         return Result.SUCCESS;
     }
 
+    /**
+     * Opens the standard text editing context menu at the current mouse position.
+     * This intentionally lives on the base widget so legacy single-line fields and
+     * the DOM/code editor receive identical editing commands.
+     */
+    protected void openContextMenu() {
+        if (this.contextMenuHandler == null) {
+            this.contextMenuHandler = IPanelHandler.simple(getPanel(),
+                    (parentPanel, player) -> TextFieldContextMenu.create(this, this.contextMenuX, this.contextMenuY), true);
+        } else if (this.contextMenuHandler.isPanelOpen()) {
+            this.contextMenuHandler.closePanel();
+        }
+        this.contextMenuX = getContext().getAbsMouseX();
+        this.contextMenuY = getContext().getAbsMouseY();
+        // The menu captures a snapshot of the selection, so rebuild it on each open.
+        this.contextMenuHandler.deleteCachedPanel();
+        this.contextMenuHandler.openPanel();
+    }
+
     @Override
     public void onMouseDrag(int mouseButton, long timeSinceClick) {
         super.onMouseDrag(mouseButton, timeSinceClick);
@@ -248,7 +296,9 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
         switch (keyCode) {
             case Keyboard.KEY_NUMPADENTER:
             case Keyboard.KEY_RETURN:
-                if (getMaxLines() > 1) {
+                if (!this.editable) {
+                    return Result.SUCCESS;
+                } else if (getMaxLines() > 1) {
                     this.handler.newLine();
                 } else {
                     getContext().removeFocus();
@@ -278,10 +328,10 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
                 return Result.SUCCESS;
             }
             case Keyboard.KEY_DELETE:
-                this.handler.delete(true);
+                if (this.editable) this.handler.delete(true);
                 return Result.SUCCESS;
             case Keyboard.KEY_BACK:
-                this.handler.delete();
+                if (this.editable) this.handler.delete();
                 return Result.SUCCESS;
         }
 
@@ -294,6 +344,7 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
             GuiScreen.setClipboardString(this.handler.getSelectedText());
             return Result.SUCCESS;
         } else if (GuiScreen.isKeyComboCtrlV(keyCode)) {
+            if (!this.editable) return Result.SUCCESS;
             if (this.handler.hasTextMarked()) {
                 this.handler.delete();
             }
@@ -301,6 +352,7 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
             this.handler.insert(GuiScreen.getClipboardString().replace("§", ""), canScrollHorizontally());
             return Result.SUCCESS;
         } else if (GuiScreen.isKeyComboCtrlX(keyCode) && this.handler.hasTextMarked()) {
+            if (!this.editable) return Result.SUCCESS;
             // copy and delete copied text
             GuiScreen.setClipboardString(this.handler.getSelectedText());
             this.handler.delete();
@@ -310,6 +362,7 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
             this.handler.markAll();
             return Result.SUCCESS;
         } else if (BASE_PATTERN.matcher(String.valueOf(character)).matches() && handler.test(String.valueOf(character))) {
+            if (!this.editable) return Result.SUCCESS;
             if (this.handler.hasTextMarked()) {
                 this.handler.delete();
             }
@@ -328,6 +381,15 @@ public class BaseTextFieldWidget<W extends BaseTextFieldWidget<W>> extends Abstr
 
     public int getMaxLines() {
         return this.handler.getMaxLines();
+    }
+
+    public boolean isEditable() {
+        return this.editable;
+    }
+
+    public W setEditable(boolean editable) {
+        this.editable = editable;
+        return getThis();
     }
 
     public ScrollData getScrollData() {

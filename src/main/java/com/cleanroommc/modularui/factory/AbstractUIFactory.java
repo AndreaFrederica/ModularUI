@@ -2,6 +2,7 @@ package com.cleanroommc.modularui.factory;
 
 import com.cleanroommc.modularui.api.IGuiHolder;
 import com.cleanroommc.modularui.api.UIFactory;
+import com.cleanroommc.modularui.api.sync.MuiProtocolTemplate;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.ModularScreen;
 import com.cleanroommc.modularui.screen.UISettings;
@@ -12,6 +13,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
@@ -42,6 +44,12 @@ public abstract class AbstractUIFactory<T extends GuiData> implements UIFactory<
 
     @NotNull
     public abstract IGuiHolder<T> getGuiHolder(T data);
+
+    @Override
+    public @Nullable MuiProtocolTemplate getProtocolTemplate(T guiData) {
+        IGuiHolder<T> guiHolder = Objects.requireNonNull(getGuiHolder(guiData), "Gui holder must not be null!");
+        return guiHolder.getProtocolTemplate(guiData);
+    }
 
     @Override
     public ModularPanel createPanel(T guiData, PanelSyncManager syncManager, UISettings settings) {

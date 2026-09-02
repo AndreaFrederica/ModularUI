@@ -99,7 +99,11 @@ public class TextFieldHandler {
                 this.scrollArea.getScrollX().setScrollSize((int) this.renderer.getLastActualWidth());
                 if (this.scrollArea.getScrollX().isScrollBarActive(this.scrollArea)) {
                     String line = this.text.get(main.y);
-                    int scrollTo = (int) this.renderer.getPosOf(this.renderer.measureLines(Collections.singletonList(line)), main).x;
+                    // The measurement contains only the current line, so its
+                    // cursor row must be relative to that one-line list.
+                    int scrollTo = (int) this.renderer.getPosOf(
+                            this.renderer.measureLines(Collections.singletonList(line)),
+                            new Point(main.x, 0)).x;
                     scrollTo -= this.scrollArea.getScrollX().getFullVisibleSize(this.scrollArea) / 2;
                     if (animate) {
                         this.scrollArea.getScrollX().animateTo(this.scrollArea, scrollTo);

@@ -63,6 +63,16 @@ public class ScrollArea extends Area {
         this.scrollY = data;
     }
 
+    /** Removes only the horizontal scroll axis. */
+    public void removeScrollDataX() {
+        this.scrollX = null;
+    }
+
+    /** Removes only the vertical scroll axis. */
+    public void removeScrollDataY() {
+        this.scrollY = null;
+    }
+
     public HorizontalScrollData getScrollX() {
         return this.scrollX;
     }

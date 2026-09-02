@@ -52,7 +52,13 @@ public class ListWidget<I extends IWidget, W extends ListWidget<I, W>> extends A
     @Override
     public void onInit() {
         if (this.scrollData == null) {
-            scrollDirection(new VerticalScrollData());
+            // A DOM stylesheet can be applied before this widget is mounted.
+            // Preserve any axis it provisioned in the ScrollArea instead of
+            // replacing it with the legacy default and losing the other axis.
+            ScrollData provisioned = getScrollArea().getScrollY();
+            if (provisioned == null) provisioned = getScrollArea().getScrollX();
+            if (provisioned != null) this.scrollData = provisioned;
+            else scrollDirection(new VerticalScrollData());
         }
     }
 
@@ -204,6 +210,11 @@ public class ListWidget<I extends IWidget, W extends ListWidget<I, W>> extends A
 
     public GuiAxis getAxis() {
         return this.scrollData.getAxis();
+    }
+
+    @Override
+    public boolean isScrollAxisRequired(GuiAxis axis) {
+        return this.scrollData != null && this.scrollData.getAxis() == axis;
     }
 
     public List<IWidget> getOrderedChildren() {
