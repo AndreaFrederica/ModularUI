@@ -34,9 +34,16 @@ export function createShowcase() {
             }
             get('toggle-font')?.setAttribute('checked',String(state.fontEnabled));
             get('toggle-shadow')?.setAttribute('checked',String(state.shadowEnabled));
-            for (const [id,key] of [['sample-input','sampleText'],['scale-slider','scale']]) {
-                const el = get(id);
-                if (el && el.value !== String(state[key])) el.value=String(state[key]);
+            const sampleInput = get('sample-input');
+            if (sampleInput && sampleInput.value !== String(state.sampleText)) sampleInput.value = String(state.sampleText);
+            const slider = get('scale-slider');
+            if (slider) {
+                const input = slider.querySelector('[data-slider-input]');
+                if (input && input.value !== String(state.scale)) input.value = String(state.scale);
+                if (input) {
+                    const min = Number(input.min || 0), max = Number(input.max || 100);
+                    slider.style.setProperty('--mui-slider-value', String(max === min ? 0 : (Number(input.value) - min) / (max - min)));
+                }
             }
             const list = get('runtime-list');
             if (list && list.childElementCount !== state.runtimeRows) {

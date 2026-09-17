@@ -89,10 +89,11 @@ export function stylesheet(files, paths) {
         .replace(/text-align\s*:\s*center-left\s*;/g, 'text-align:left;justify-content:flex-start;')
         .replace(/text-align\s*:\s*center\s*;/g, 'text-align:center;justify-content:center;')
         .replace(/(?:grid-columns|columns)\s*:\s*(\d+)\s*;/g, 'grid-template-columns:repeat($1, max-content);')
-        .replace(/progress-(track-color|fill-color|direction)\s*:/g, '--progress-$1:');
+        .replace(/progress-(track-color|fill-color|direction)\s*:/g, '--progress-$1:')
+        .replace(/slider-(track-color|track-height|track-inset|handle-color|handle-width|handle-height)\s*:/g, '--mui-slider-$1:');
 }
 
-export const baseStyle = `
+export const baseStyle = `@layer mui-default {
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#11161d;color:#404040;font:12px Arial,sans-serif}
 [data-mui-tag]{position:absolute;min-width:0;min-height:0;flex-shrink:0;pointer-events:none}
 :where([data-preview-panel]){width:var(--mui-panel-width);height:var(--mui-panel-height)}
@@ -103,15 +104,19 @@ export const baseStyle = `
 [data-flow-child]{position:relative}
 [data-mui-tag="mui:text"]{display:flex;align-items:center;white-space:pre-wrap}
 [data-mui-tag="mui:scroll"]{overflow:auto;pointer-events:auto}
-button:where([data-mui-tag]){width:18px;height:18px;border:1px solid #555;padding:0 2px;color:#fff;background:linear-gradient(#8b8b8b 0 50%,#707070 50%);box-shadow:inset 1px 1px #c6c6c6,inset -1px -1px #3f3f3f;text-shadow:1px 1px #3f3f3f;font:inherit;text-align:center;cursor:pointer;pointer-events:auto}
-button:where([data-mui-tag]):hover{background:linear-gradient(#a0a0a0 0 50%,#858585 50%)}button:where([data-mui-tag]):active{background:linear-gradient(#707070 0 50%,#8b8b8b 50%);text-shadow:none}
-:where(button[data-mui-tag][disabled]){color:#8b8b8b;background:linear-gradient(#707070 0 50%,#606060 50%);text-shadow:none;cursor:default}
-:where(button[data-mui-tag][checked="true"]){background:linear-gradient(#5b8d78 0 50%,#3e6657 50%)}
-input:where([data-mui-tag]){margin:0;width:56px;height:18px;border:1px solid #555;padding:2px 3px;color:#fff;background:#202020;box-shadow:inset 1px 1px #111,inset -1px -1px #777;font:inherit;pointer-events:auto;accent-color:#2f72a8}
+button:where([data-mui-tag]){-webkit-appearance:none;appearance:none;width:18px;height:18px;border:0;border-radius:0;padding:0;color:#fff;background:linear-gradient(#c6c6c6 0 1px,transparent 1px calc(100% - 1px),#3f3f3f calc(100% - 1px)),linear-gradient(90deg,#c6c6c6 0 1px,#858585 1px calc(100% - 1px),#3f3f3f calc(100% - 1px));box-shadow:none;text-shadow:1px 1px #3f3f3f;font:inherit;text-align:center;cursor:pointer;pointer-events:auto}
+button:where([data-mui-tag]):hover{background:linear-gradient(#eee 0 1px,transparent 1px calc(100% - 1px),#555 calc(100% - 1px)),linear-gradient(90deg,#eee 0 1px,#a0a0a0 1px calc(100% - 1px),#555 calc(100% - 1px))}button:where([data-mui-tag]):active{filter:brightness(.84);text-shadow:none}
+:where(button[data-mui-tag][disabled]){color:#8b8b8b;filter:brightness(.72);text-shadow:none;cursor:default}
+:where(button[data-mui-tag][checked="true"]){background:#4b7866}
+input:where([data-mui-tag]){-webkit-appearance:none;appearance:none;margin:0;width:56px;height:18px;border:0;border-radius:0;padding:2px 3px;color:#fff;background:linear-gradient(#111 0 1px,transparent 1px calc(100% - 1px),#777 calc(100% - 1px)),linear-gradient(90deg,#111 0 1px,#202020 1px calc(100% - 1px),#777 calc(100% - 1px));box-shadow:none;font:inherit;pointer-events:auto}
 button[data-mui-tag]:focus-visible,input:focus-visible{outline:2px solid #70d9c8;outline-offset:-2px}
  :where([data-mui-tag="mui:item-slot"]){width:18px;height:18px;background:#8b8b8b;border:1px solid #373737;box-shadow:inset 1px 1px #c6c6c6,inset -1px -1px #5b5b5b;pointer-events:auto;cursor:pointer;color:#fff;font:10px monospace;display:flex;align-items:center;justify-content:center}
 :where([data-mui-tag="mui:item-slot"]):hover{background:#a0a0a0;box-shadow:inset 0 0 0 1px #fff}
-:where([data-mui-tag="nfr:slider"]){width:56px;height:18px;background:transparent;border:0;box-shadow:none;padding:0}
+:where([data-mui-tag="nfr:slider"]){width:auto;min-width:56px;height:18px;background:transparent;border:0;box-shadow:none;padding:0;cursor:pointer;pointer-events:auto}
+:where([data-mui-tag="nfr:slider"])>[data-slider-track]{position:absolute;left:var(--mui-slider-track-inset,0px);right:var(--mui-slider-track-inset,0px);top:calc(50% - var(--mui-slider-track-height,0px)/2);height:var(--mui-slider-track-height,0px);background:var(--mui-slider-track-color,transparent);pointer-events:none}
+:where([data-mui-tag="nfr:slider"])>[data-slider-thumb]{position:absolute;left:calc((100% - var(--mui-slider-handle-width,6px))*var(--mui-slider-value, .5));top:calc(50% - var(--mui-slider-handle-height,100%)/2);width:var(--mui-slider-handle-width,6px);height:var(--mui-slider-handle-height,100%);background:var(--mui-slider-handle-color,transparent);pointer-events:none}
+:where([data-mui-tag="nfr:slider"])>[data-slider-input]{position:absolute;inset:0;z-index:1;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer;pointer-events:auto}
+:where([data-mui-tag="nfr:slider"]):focus-within{outline:2px solid #70d9c8;outline-offset:-2px}
 :where([data-mui-tag="nfr:text-field"]){width:56px;height:18px}
 :where([data-mui-tag="mui:progress"]){width:100%;height:100%;background:var(--progress-track-color,#27323d)}
 [data-mui-tag="mui:progress"]>i{position:absolute;left:0;bottom:0;background:var(--progress-fill-color,#38bda6)}
@@ -122,6 +127,7 @@ body.inspect [data-mui-tag]{pointer-events:auto!important}body.inspect [data-mui
 body.move-mode [data-mui-tag]{pointer-events:auto!important;cursor:grab!important}body.moving-window [data-mui-tag]{cursor:grabbing!important}
 #dev-overlay{position:fixed;z-index:2147483647;pointer-events:none;background:#4696e647;outline:2px solid #57a7f2;box-sizing:border-box}
 #dev-overlay[hidden]{display:none}#dev-tooltip{position:fixed;z-index:100000;width:max-content;max-width:95vw;padding:2px 5px;background:#e8f1fc;color:#172b41;font:11px monospace;white-space:nowrap;box-shadow:0 1px 3px #0008}
+}
 `;
 
 export function render(tree, doc, {log, change, inspect, hover}) {
@@ -130,7 +136,7 @@ export function render(tree, doc, {log, change, inspect, hover}) {
     function make(node, parentTag) {
         if (typeof node === 'string') return doc.createTextNode(node);
         const tag = node.tag;
-        const el = doc.createElement(tag === 'mui:button' ? 'button' : tag === 'nfr:slider' || tag === 'nfr:text-field' ? 'input' : 'div');
+        const el = doc.createElement(tag === 'mui:button' ? 'button' : tag === 'nfr:text-field' ? 'input' : 'div');
         el.dataset.muiTag = tag;
         el.dataset.muiIndex = String(elementIndex++);
         el.muiNode = node;
@@ -145,6 +151,7 @@ export function render(tree, doc, {log, change, inspect, hover}) {
         if (tag === 'mui:grid' && node.attrs.columns) el.style.setProperty('--mui-grid-columns', `repeat(${Math.max(1, Math.min(128, Number(node.attrs.columns) || 1))},max-content)`);
         if (tag === 'mui:button') {
             el.type = 'button';
+            el.style.pointerEvents = 'auto';
             el.disabled = node.attrs.disabled === 'true';
             el.addEventListener('click', () => {
                 const action = node.attrs.onclick || el.dataset.muiAction;
@@ -153,14 +160,39 @@ export function render(tree, doc, {log, change, inspect, hover}) {
                 else log(`click ${node.attrs.id || tag}`);
             });
         }
-        if (el.tagName === 'INPUT') {
-            el.type = tag === 'nfr:slider' ? 'range' : 'text';
+        if (tag === 'nfr:slider') {
+            el.style.pointerEvents = 'auto';
+            const track = doc.createElement('i');
+            const thumb = doc.createElement('i');
+            const input = doc.createElement('input');
+            track.dataset.sliderTrack = '';
+            thumb.dataset.sliderThumb = '';
+            input.dataset.sliderInput = '';
+            input.type = 'range';
             for (const key of ['min','max','step']) if (node.attrs[key]) el.setAttribute(key,node.attrs[key]);
+            for (const key of ['min','max','step']) if (node.attrs[key]) input.setAttribute(key,node.attrs[key]);
+            input.value = node.attrs.value ?? '1';
+            input.setAttribute('aria-label', node.attrs.id || 'slider');
+            const updateSlider = () => {
+                const min = Number(input.min || 0), max = Number(input.max || 100);
+                el.style.setProperty('--mui-slider-value', String(max === min ? 0 : (Number(input.value) - min) / (max - min)));
+            };
+            updateSlider();
+            input.addEventListener('input', () => {
+                updateSlider();
+                change(node.attrs['store-key'] || node.attrs.id || 'value', Number(input.value), el);
+            });
+            el.append(track, thumb, input);
+        }
+        if (tag === 'nfr:text-field') {
+            el.style.pointerEvents = 'auto';
+            el.type = 'text';
             if (node.attrs['max-length']) el.maxLength = Number(node.attrs['max-length']);
-            el.value = node.attrs.value ?? (el.type === 'range' ? '1' : '');
-            el.addEventListener('input', () => change(node.attrs['store-key'] || node.attrs.id || 'value',el.type === 'range' ? Number(el.value) : el.value,el));
+            el.value = node.attrs.value ?? '';
+            el.addEventListener('input', () => change(node.attrs['store-key'] || node.attrs.id || 'value',el.value,el));
         }
         if (tag === 'mui:item-slot') {
+            el.style.pointerEvents = 'auto';
             el.tabIndex = 0; el.setAttribute('role','button'); el.setAttribute('aria-label',node.attrs.bind || '模拟物品槽');
             el.title = `${node.attrs.bind || 'slot'} · 点击模拟放入/取出物品`;
             const toggle = () => { el.textContent = el.textContent ? '' : '◆'; change('slot', {bind:node.attrs.bind, occupied:!!el.textContent},el); };
@@ -172,6 +204,7 @@ export function render(tree, doc, {log, change, inspect, hover}) {
         return el;
     }
     const root = make(tree);
+    root.style.pointerEvents = 'auto';
     const pickTarget = e => {
         const candidates=doc.elementsFromPoint(e.clientX,e.clientY)
             .filter(el=>el.dataset?.muiTag && el.getBoundingClientRect().width && el.getBoundingClientRect().height);

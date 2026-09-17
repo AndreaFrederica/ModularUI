@@ -252,7 +252,6 @@ function rebuild() {
             : {width:194,height:222,name:'设备面板'};
         if (fullScreen) {
             root.style.left = '0'; root.style.top = '0'; root.style.width = '100%'; root.style.height = '100%';
-            root.style.transform = 'none';
             $('geometry').textContent = `ModularScreen: relativeToScreen().full()\n模式: 全屏\n视口: ${$('width').value} × ${$('height').value}\n坐标原点: 屏幕左上角`;
         } else {
             root.style.left = `${Math.floor((Number($('width').value)-panel.width)/2)}px`;
@@ -260,11 +259,10 @@ function rebuild() {
             root.dataset.previewPanel = '';
             root.style.setProperty('--mui-panel-width',`${panel.width}px`);
             root.style.setProperty('--mui-panel-height',`${panel.height}px`);
-            root.style.transform = 'none';
             $('geometry').textContent = `ModularPanel: center()\n模式: ${panel.name}\n面板: ${panel.width} × ${panel.height}\n位置: (${Math.floor((Number($('width').value)-panel.width)/2)}, ${Math.floor((Number($('height').value)-panel.height)/2)})\n坐标原点: 面板左上角`;
         }
         const saved=windowOffsets.get($('screen').value);
-        if(saved){root.style.left=`${saved.x}px`;root.style.top=`${saved.y}px`;root.style.transform='none';}
+        if(saved){root.style.left=`${saved.x}px`;root.style.top=`${saved.y}px`;}
         installWindowDrag(root,doc);
         root.addEventListener('pointerdown', () => {if (simulated() && !pickMode) {controller.capture();sync();}},true);
         const style = doc.createElement('style');style.textContent=baseStyle;style.dataset.source='ModularUI defaults';
@@ -298,7 +296,7 @@ function installWindowDrag(root,doc) {
     root.addEventListener('pointermove',e=>{
         if(!drag || e.pointerId!==drag.pointer)return;
         const x=Math.round(drag.x+e.clientX-drag.startX),y=Math.round(drag.y+e.clientY-drag.startY);
-        root.style.left=`${x}px`;root.style.top=`${y}px`;root.style.transform='none';
+        root.style.left=`${x}px`;root.style.top=`${y}px`;
         windowOffsets.set($('screen').value,{x,y});
         $('geometry').textContent=`Dragged window: (${x}, ${y})\nViewport: ${$('width').value} × ${$('height').value}`;
         if(selectedElement)highlight(selectedElement);
