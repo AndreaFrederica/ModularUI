@@ -59,10 +59,25 @@ export function compile(files, manifest, screen) {
 }
 
 export function stylesheet(files, paths) {
+    function normalizePath(path) {
+        const parts = [];
+        for (const part of path.replaceAll('\\', '/').split('/')) {
+            if (!part || part === '.') continue;
+            if (part === '..') parts.pop();
+            else parts.push(part);
+        }
+        return parts.join('/');
+    }
     function load(path, stack = []) {
+        path = normalizePath(path);
         if (stack.includes(path) || stack.length > 32) throw Error(`CSS @import 循环：${path}`);
         let css = resource(files, path).replace(/\/\*[\s\S]*?\*\//g, '');
-        css = css.replace(/@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?\s*;/g, (_, imported) => load(imported, [...stack, path]));
+        css = css.replace(/@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?\s*;/g, (_, imported) => {
+            const base = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
+            const relative = normalizePath(`${base}${imported}`);
+            const resolved = Object.hasOwn(files, relative) ? relative : normalizePath(imported);
+            return load(resolved, [...stack, path]);
+        });
         if (/@import|url\s*\(/i.test(css)) throw Error(`${path}: 预览不加载外部 CSS/图片 URL`);
         return css;
     }

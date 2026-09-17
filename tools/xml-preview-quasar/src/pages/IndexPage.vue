@@ -8,7 +8,7 @@ onMounted(async () => {
   const source = await (await fetch('/legacy-template.html')).text();
   const template = new DOMParser().parseFromString(source, 'text/html');
   for (const node of [...template.body.childNodes]) {
-    if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'SCRIPT') continue;
+    if (node.nodeType === Node.ELEMENT_NODE && ['SCRIPT', 'LINK'].includes((node as Element).tagName)) continue;
     host.append(node.cloneNode(true));
   }
   runtime = await import('../lib/legacy-app.js');
