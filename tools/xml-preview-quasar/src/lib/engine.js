@@ -119,6 +119,7 @@ export function render(tree, doc, {log, change, inspect, hover}) {
         el.dataset.muiTag = tag;
         el.dataset.muiIndex = String(elementIndex++);
         el.muiNode = node;
+        if (node.attrs.onclick) el.dataset.muiAction = node.attrs.onclick;
         // Never copy arbitrary HTML attributes such as onclick, src, or style.
         for (const [key,value] of Object.entries(node.attrs)) {
             if (['id','class','checked','bind'].includes(key) || key.startsWith('data-')) el.setAttribute(key,value);
@@ -129,14 +130,17 @@ export function render(tree, doc, {log, change, inspect, hover}) {
         if (tag === 'mui:grid' && node.attrs.columns) el.style.gridTemplateColumns = `repeat(${Math.max(1, Math.min(128, Number(node.attrs.columns) || 1))},max-content)`;
         if (tag === 'mui:button') {
             el.type = 'button';
+            el.style.pointerEvents = 'auto';
             el.disabled = node.attrs.disabled === 'true';
             el.addEventListener('click', () => {
-                if (node.attrs.onclick) change('action', node.attrs.onclick, el);
+                const action = node.attrs.onclick || el.dataset.muiAction;
+                if (action) change('action', action, el);
                 else if (el.hasAttribute('checked')) { el.setAttribute('checked', String(el.getAttribute('checked') !== 'true')); change('checked',el.getAttribute('checked'),el); }
                 else log(`click ${node.attrs.id || tag}`);
             });
         }
         if (el.tagName === 'INPUT') {
+            el.style.pointerEvents = 'auto';
             el.type = tag === 'nfr:slider' ? 'range' : 'text';
             for (const key of ['min','max','step']) if (node.attrs[key]) el.setAttribute(key,node.attrs[key]);
             if (node.attrs['max-length']) el.maxLength = Number(node.attrs['max-length']);
@@ -144,6 +148,7 @@ export function render(tree, doc, {log, change, inspect, hover}) {
             el.addEventListener('input', () => change(node.attrs['store-key'] || node.attrs.id || 'value',el.type === 'range' ? Number(el.value) : el.value,el));
         }
         if (tag === 'mui:item-slot') {
+            el.style.pointerEvents = 'auto';
             el.tabIndex = 0; el.setAttribute('role','button'); el.setAttribute('aria-label',node.attrs.bind || '模拟物品槽');
             el.title = `${node.attrs.bind || 'slot'} · 点击模拟放入/取出物品`;
             const toggle = () => { el.textContent = el.textContent ? '' : '◆'; change('slot', {bind:node.attrs.bind, occupied:!!el.textContent},el); };
@@ -155,6 +160,7 @@ export function render(tree, doc, {log, change, inspect, hover}) {
         return el;
     }
     const root = make(tree);
+    root.style.pointerEvents = 'auto';
     const pickTarget = e => {
         const candidates=doc.elementsFromPoint(e.clientX,e.clientY)
             .filter(el=>el.dataset?.muiTag && el.getBoundingClientRect().width && el.getBoundingClientRect().height);
