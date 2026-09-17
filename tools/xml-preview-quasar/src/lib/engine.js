@@ -97,16 +97,16 @@ export const baseStyle = `
 [data-mui-tag]{position:absolute;min-width:0;min-height:0;flex-shrink:0;pointer-events:none}
 :where([data-preview-panel]){width:var(--mui-panel-width);height:var(--mui-panel-height)}
 [data-mui-tag="mui:container"]{color:#404040}
-[data-mui-tag="mui:row"],[data-mui-tag="mui:column"],[data-mui-tag="mui:list"]{display:flex;gap:0}
-[data-mui-tag="mui:column"],[data-mui-tag="mui:list"]{flex-direction:column}
-[data-mui-tag="mui:grid"]{display:grid;grid-template-columns:repeat(1,max-content);align-content:start}
+:where([data-mui-tag="mui:row"],[data-mui-tag="mui:column"],[data-mui-tag="mui:list"]){display:flex;gap:0}
+:where([data-mui-tag="mui:column"],[data-mui-tag="mui:list"]){flex-direction:column}
+:where([data-mui-tag="mui:grid"]){display:grid;grid-template-columns:var(--mui-grid-columns,repeat(1,max-content));align-content:start}
 [data-flow-child]{position:relative}
 [data-mui-tag="mui:text"]{display:flex;align-items:center;white-space:pre-wrap}
 [data-mui-tag="mui:scroll"]{overflow:auto;pointer-events:auto}
 button:where([data-mui-tag]){width:18px;height:18px;border:1px solid #555;padding:0 2px;color:#fff;background:linear-gradient(#8b8b8b 0 50%,#707070 50%);box-shadow:inset 1px 1px #c6c6c6,inset -1px -1px #3f3f3f;text-shadow:1px 1px #3f3f3f;font:inherit;text-align:center;cursor:pointer;pointer-events:auto}
 button:where([data-mui-tag]):hover{background:linear-gradient(#a0a0a0 0 50%,#858585 50%)}button:where([data-mui-tag]):active{background:linear-gradient(#707070 0 50%,#8b8b8b 50%);text-shadow:none}
-button:where([data-mui-tag])[disabled]{color:#8b8b8b;background:linear-gradient(#707070 0 50%,#606060 50%);text-shadow:none;cursor:default}
-button:where([data-mui-tag])[checked="true"]{background:linear-gradient(#5b8d78 0 50%,#3e6657 50%)}
+:where(button[data-mui-tag][disabled]){color:#8b8b8b;background:linear-gradient(#707070 0 50%,#606060 50%);text-shadow:none;cursor:default}
+:where(button[data-mui-tag][checked="true"]){background:linear-gradient(#5b8d78 0 50%,#3e6657 50%)}
 input:where([data-mui-tag]){margin:0;width:56px;height:18px;border:1px solid #555;padding:2px 3px;color:#fff;background:#202020;box-shadow:inset 1px 1px #111,inset -1px -1px #777;font:inherit;pointer-events:auto;accent-color:#2f72a8}
 button[data-mui-tag]:focus-visible,input:focus-visible{outline:2px solid #70d9c8;outline-offset:-2px}
  :where([data-mui-tag="mui:item-slot"]){width:18px;height:18px;background:#8b8b8b;border:1px solid #373737;box-shadow:inset 1px 1px #c6c6c6,inset -1px -1px #5b5b5b;pointer-events:auto;cursor:pointer;color:#fff;font:10px monospace;display:flex;align-items:center;justify-content:center}
@@ -142,10 +142,9 @@ export function render(tree, doc, {log, change, inspect, hover}) {
         if (['mui:row','mui:column','mui:grid','mui:list'].includes(parentTag)) el.dataset.flowChild = '';
         if (!known.has(tag)) { el.dataset.unknown = ''; log(`未适配原生元素 ${tag}，显示为容器`); }
         if (tag === 'mui:text') el.textContent = node.attrs.text ?? '';
-        if (tag === 'mui:grid' && node.attrs.columns) el.style.gridTemplateColumns = `repeat(${Math.max(1, Math.min(128, Number(node.attrs.columns) || 1))},max-content)`;
+        if (tag === 'mui:grid' && node.attrs.columns) el.style.setProperty('--mui-grid-columns', `repeat(${Math.max(1, Math.min(128, Number(node.attrs.columns) || 1))},max-content)`);
         if (tag === 'mui:button') {
             el.type = 'button';
-            el.style.pointerEvents = 'auto';
             el.disabled = node.attrs.disabled === 'true';
             el.addEventListener('click', () => {
                 const action = node.attrs.onclick || el.dataset.muiAction;
@@ -155,7 +154,6 @@ export function render(tree, doc, {log, change, inspect, hover}) {
             });
         }
         if (el.tagName === 'INPUT') {
-            el.style.pointerEvents = 'auto';
             el.type = tag === 'nfr:slider' ? 'range' : 'text';
             for (const key of ['min','max','step']) if (node.attrs[key]) el.setAttribute(key,node.attrs[key]);
             if (node.attrs['max-length']) el.maxLength = Number(node.attrs['max-length']);
@@ -163,7 +161,6 @@ export function render(tree, doc, {log, change, inspect, hover}) {
             el.addEventListener('input', () => change(node.attrs['store-key'] || node.attrs.id || 'value',el.type === 'range' ? Number(el.value) : el.value,el));
         }
         if (tag === 'mui:item-slot') {
-            el.style.pointerEvents = 'auto';
             el.tabIndex = 0; el.setAttribute('role','button'); el.setAttribute('aria-label',node.attrs.bind || '模拟物品槽');
             el.title = `${node.attrs.bind || 'slot'} · 点击模拟放入/取出物品`;
             const toggle = () => { el.textContent = el.textContent ? '' : '◆'; change('slot', {bind:node.attrs.bind, occupied:!!el.textContent},el); };
@@ -175,7 +172,6 @@ export function render(tree, doc, {log, change, inspect, hover}) {
         return el;
     }
     const root = make(tree);
-    root.style.pointerEvents = 'auto';
     const pickTarget = e => {
         const candidates=doc.elementsFromPoint(e.clientX,e.clientY)
             .filter(el=>el.dataset?.muiTag && el.getBoundingClientRect().width && el.getBoundingClientRect().height);
