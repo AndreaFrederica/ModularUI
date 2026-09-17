@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MUI XML Preview</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><strong>MUI XML Preview</strong><nav id="primary-tabs" aria-label="Workspace"><button class="active" data-workspace="elements" type="button">Elements</button><button data-workspace="sources" type="button">Sources</button></nav><span id="connection">Connecting</span></header>
+<nav class="toolbar">
+  <button id="pick" type="button" title="Pick an element from the preview">⌖</button>
+  <label>Screen <select id="screen"></select></label>
+  <span class="separator"></span>
+  <label>Viewport <input id="width" type="number" value="854" min="240" max="2560" aria-label="Viewport width"> × <input id="height" type="number" value="480" min="180" max="1600" aria-label="Viewport height"></label>
+  <button id="resize" type="button">Apply</button>
+  <button id="reset" type="button">Reset state</button>
+  <button id="move-window" type="button" title="Drag the preview window; click again to leave move mode">Move window</button>
+  <button id="reset-position" type="button" title="Restore the screen's game position">Reset position</button>
+  <label class="fit-control"><input id="fit" type="checkbox" checked> Fit</label><span id="zoom">100%</span>
+  <button id="console-toggle" type="button" aria-expanded="false">Console</button>
+</nav>
+<main id="workspace">
+  <aside class="elements pane"><div class="pane-title">DOM TREE <span id="element-count"></span></div><div class="tree-search"><input id="node-search" type="search" placeholder="Find element" aria-label="Find element"><span id="search-count"></span><button id="search-prev" type="button" title="Previous match">↑</button><button id="search-next" type="button" title="Next match">↓</button></div><div id="dom-tree" role="tree"></div></aside>
+  <div class="splitter" data-split="left" role="separator" aria-label="Resize Elements panel" tabindex="0"></div>
+  <section class="workbench"><div class="viewport-bar"><span>Preview</span><span id="viewport-label">854 × 480</span></div><div id="error" role="alert" hidden></div><div class="canvas"><div id="viewport-stage"><iframe id="preview" title="MUI screen preview" sandbox="allow-same-origin"></iframe></div></div><div id="breadcrumbs" aria-label="Selected element path"></div></section>
+  <div class="splitter" data-split="right" role="separator" aria-label="Resize inspector" tabindex="0"></div>
+  <aside class="inspector pane">
+    <div class="tabs"><button type="button" class="active" data-tab="styles">Styles</button><button type="button" data-tab="computed">Computed</button><button type="button" data-tab="state">State</button></div>
+    <section class="tab-panel" data-panel="styles">
+      <div id="selected" class="node-summary">Select an element</div>
+      <div class="section-title">Matched rules</div><div id="matched-rules"></div>
+      <div class="section-title">Preview overrides</div><label class="field">class <input id="class-edit" type="text"></label><label class="field">style <input id="inline-edit" type="text" placeholder="color: red;"></label><button id="apply-element" type="button">Apply override</button>
+    </section>
+    <section class="tab-panel" data-panel="computed" hidden><div class="section-title">Computed properties</div><pre id="computed"></pre><div class="section-title">Box model</div><div id="boxmodel"></div></section>
+    <section class="tab-panel" data-panel="state" hidden><label class="field">Adapter <select id="adapter"><option value="none">Generic controls</option><option value="showcase">MUI XML Showcase</option></select></label><label class="field">Progress <input id="progress" type="range" min="0" max="100" value="45"></label><pre id="state"></pre><div class="section-title">Screen geometry</div><pre id="geometry"></pre><div class="section-title">Events</div><pre id="events"></pre></section>
+  </aside>
+  <section id="sources-workspace" hidden><aside class="source-files pane"><div class="pane-title">FILES</div><div id="file-list"></div></aside><div class="source-editor"><div class="source-toolbar"><label>Resource <select id="source"></select></label><div class="actions"><button id="apply" type="button">Apply draft</button><button id="discard" type="button">Discard draft</button></div></div><textarea id="editor" spellcheck="false" aria-label="Resource source"></textarea><div class="source-footer"><small id="draft">Disk changes reload automatically. Drafts stay in the browser.</small><div class="additional-styles"><span>Additional stylesheets</span><div id="styles"></div></div></div></div></section>
+  <div id="console-drawer" hidden><div id="drawer-grip" role="separator" aria-label="Resize console" tabindex="0"></div><div class="pane-title">CONSOLE <button id="clear-console" type="button" title="Clear console">Clear</button><button id="close-console" type="button" title="Close console">×</button></div><pre id="console" aria-live="polite"></pre></div>
+</main>
+<script type="module" src="/app.js"></script>
+</body></html>

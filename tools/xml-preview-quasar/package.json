@@ -1,0 +1,53 @@
+{
+  "name": "mui-xml-preview",
+  "version": "0.0.1",
+  "description": "A Quasar Project",
+  "productName": "MUI XML Preview",
+  "author": "AndreaFrederica <andreafrederica@outlook.com>",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "prettier --write \"**/*.{js,ts,vue,css,scss,html,md,json}\" --ignore-path .gitignore && eslint --fix -c ./eslint.config.js \"./src*/**/*.{ts,js,cjs,mjs,vue}\"",
+    "lint:check": "prettier \"**/*.{js,ts,vue,css,scss,html,md,json}\" --ignore-path .gitignore && eslint -c ./eslint.config.js \"./src*/**/*.{ts,js,cjs,mjs,vue}\"",
+    "dev": "quasar dev",
+    "build": "quasar build",
+    "typecheck": "vue-tsc --noEmit",
+    "postinstall": "quasar prepare --silent"
+  },
+  "dependencies": {
+    "@quasar/extras": "^2.1.0",
+    "quasar": "^2.32.3",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.22",
+    "vue-router": "^5.0.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.0",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.4.0",
+    "@vue/eslint-config-typescript": "^14.7.0",
+    "vite-plugin-checker": "^0.14.5",
+    "vue-eslint-parser": "^10.4.0",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "prettier": "^3.8.1",
+    "vue-tsc": "^3.3.3",
+    "@types/node": "^22.19.11",
+    "@quasar/app-vite": "^3.8.4",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "typescript": "^6.0.0"
+  },
+  "keywords": [
+    "quasar",
+    "quasar-app",
+    "quasar-cli",
+    "quasar-app-vite",
+    "vite",
+    "vue",
+    "vuejs"
+  ],
+  "engines": {
+    "node": ">= 26 || ^24 || ^22.12"
+  }
+}

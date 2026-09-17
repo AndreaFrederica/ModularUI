@@ -78,6 +78,8 @@ public final class MuiProtocolXmlParser {
                             if (state.builder != null) fail(reader, "Protocol XML contains more than one protocol root");
                             state.builder = MuiProtocolPlan.builder(required(reader, attributes, "id"),
                                     integer(reader, required(reader, attributes, "schema-version"), "schema-version"));
+                        } else if ("slot-range".equals(name)) {
+                            expandSlotRange(reader, state.builder, attributes, ordinalOffset);
                         } else {
                             if (!"protocol-component".equals(name)) {
                                 fail(reader, "Protocol component root must be <protocol-component>");
@@ -176,6 +178,20 @@ public final class MuiProtocolXmlParser {
         if (first > Integer.MAX_VALUE - second) fail(reader, "Protocol slot ordinal exceeds the integer limit");
         return first + second;
     }
+
+    private static void expandSlotRange(XMLStreamReader reader, MuiProtocolPlan.Builder builder,
+                                        Map<String, String> attributes, int ordinalOffset) {
+        requireOnly(reader, attributes, "prefix", "count", "type", "version", "ordinal");
+        String prefix = required(reader, attributes, "prefix");
+        int count = integer(reader, required(reader, attributes, "count"), "count");
+        int version = integer(reader, required(reader, attributes, "version"), "version");
+        int first = integer(reader, required(reader, attributes, "ordinal"), "ordinal");
+        String type = required(reader, attributes, "type");
+        if (count <= 0 || count > MAX_ENTRIES) fail(reader, "Invalid slot range count");
+        for (int i = 0; i < count; i++) builder.slot(prefix + i, 0, type, version,
+                addOrdinal(reader, ordinalOffset, first + i));
+    }
+
 
     private static Map<String, String> attributes(XMLStreamReader reader) {
         if (reader.getAttributeCount() > 8) fail(reader, "Protocol XML element has too many attributes");
