@@ -78,8 +78,6 @@ public final class MuiProtocolXmlParser {
                             if (state.builder != null) fail(reader, "Protocol XML contains more than one protocol root");
                             state.builder = MuiProtocolPlan.builder(required(reader, attributes, "id"),
                                     integer(reader, required(reader, attributes, "schema-version"), "schema-version"));
-                        } else if ("slot-range".equals(name)) {
-                            expandSlotRange(reader, state.builder, attributes, ordinalOffset);
                         } else {
                             if (!"protocol-component".equals(name)) {
                                 fail(reader, "Protocol component root must be <protocol-component>");
@@ -90,6 +88,8 @@ public final class MuiProtocolXmlParser {
                         if (state.builder == null) fail(reader, "Protocol XML is missing its root");
                         if ("component".equals(name)) {
                             includeComponent(reader, state, attributes, ordinalOffset);
+                        } else if ("slot-range".equals(name)) {
+                            expandSlotRange(reader, state, attributes, ordinalOffset);
                         } else {
                             if (++state.entries > MAX_ENTRIES) {
                                 fail(reader, "Expanded protocol entry count exceeds the limit");
@@ -179,7 +179,7 @@ public final class MuiProtocolXmlParser {
         return first + second;
     }
 
-    private static void expandSlotRange(XMLStreamReader reader, MuiProtocolPlan.Builder builder,
+    private static void expandSlotRange(XMLStreamReader reader, ParseState state,
                                         Map<String, String> attributes, int ordinalOffset) {
         requireOnly(reader, attributes, "prefix", "count", "type", "version", "ordinal");
         String prefix = required(reader, attributes, "prefix");
@@ -188,8 +188,13 @@ public final class MuiProtocolXmlParser {
         int first = integer(reader, required(reader, attributes, "ordinal"), "ordinal");
         String type = required(reader, attributes, "type");
         if (count <= 0 || count > MAX_ENTRIES) fail(reader, "Invalid slot range count");
-        for (int i = 0; i < count; i++) builder.slot(prefix + i, 0, type, version,
-                addOrdinal(reader, ordinalOffset, first + i));
+        if (count > MAX_ENTRIES - state.entries) {
+            fail(reader, "Expanded protocol entry count exceeds the limit");
+        }
+        int start = addOrdinal(reader, ordinalOffset, first);
+        addOrdinal(reader, start, count - 1);
+        state.entries += count;
+        for (int i = 0; i < count; i++) state.builder.slot(prefix + i, 0, type, version, start + i);
     }
 
 

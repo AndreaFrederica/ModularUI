@@ -44,6 +44,53 @@ class ProtocolTemplateTest {
     private static final String FACTORY_NAME = "mui_protocol_test";
 
     @Test
+    void slotRangeMatchesExplicitSlotsAndAppliesComponentOffset() {
+        String range = "<slot-range prefix=\"storage.\" count=\"256\" type=\"test:item\" version=\"1\" ordinal=\"0\"/>";
+        String start = "<protocol id=\"test:large-chest\" schema-version=\"2\">";
+        MuiProtocolPlan compact = MuiProtocolXmlParser.parse(start + range + "</protocol>");
+        StringBuilder expanded = new StringBuilder(start);
+        for (int i = 0; i < 256; i++) {
+            expanded.append("<slot key=\"storage.").append(i)
+                    .append("\" type=\"test:item\" version=\"1\" ordinal=\"").append(i).append("\"/>");
+        }
+        expanded.append("</protocol>");
+        assertTrue(compact.matches(MuiProtocolXmlParser.parse(expanded.toString())));
+        MuiResourceResolver resolver = (owner, resource) -> new ByteArrayInputStream(
+                ("<protocol-component>" + range + "</protocol-component>").getBytes(StandardCharsets.UTF_8));
+        MuiProtocolPlan offset = MuiProtocolXmlParser.parse("test",
+                start + "<component src=\"storage.xml\" ordinal-offset=\"36\"/></protocol>", resolver);
+        assertEquals(256, offset.getEntries().size());
+        assertEquals(36, offset.getEntries().get(0).getOrder());
+        assertEquals(291, offset.getEntries().get(255).getOrder());
+        assertEquals("storage.255", offset.getEntries().get(255).getKey());
+    }
+
+    @Test
+    void slotRangesRespectExpandedLimitsAndComponentRoots() {
+        String start = "<protocol id=\"test:range-limits\" schema-version=\"2\">";
+        String range = "<slot-range prefix=\"storage.\" count=\"4096\" type=\"test:item\" version=\"1\" ordinal=\"0\"/>";
+        assertEquals(4096, MuiProtocolXmlParser.parse(start + range + "</protocol>").getEntries().size());
+        MuiResourceResolver resolver = (owner, resource) -> new ByteArrayInputStream(
+                ("<protocol-component>" + range + "</protocol-component>").getBytes(StandardCharsets.UTF_8));
+        String extra = "<slot key=\"extra\" type=\"test:item\" version=\"1\" ordinal=\"4096\"/>";
+        assertThrows(MuiMarkupException.class, () -> MuiProtocolXmlParser.parse("test",
+                start + extra + "<component src=\"slots.xml\"/></protocol>", resolver));
+        assertThrows(MuiMarkupException.class, () -> MuiProtocolXmlParser.parse("test",
+                start + "<component src=\"slots.xml\"/>" + extra + "</protocol>", resolver));
+        for (String count : new String[] { "0", "4097" }) {
+            assertThrows(MuiMarkupException.class, () -> MuiProtocolXmlParser.parse(
+                    start + range.replace("count=\"4096\"", "count=\"" + count + "\"") + "</protocol>"));
+        }
+        assertThrows(MuiMarkupException.class, () -> MuiProtocolXmlParser.parse(
+                start + range.replace("ordinal=\"0\"", "ordinal=\"2147483647\"") + "</protocol>"));
+        assertThrows(MuiMarkupException.class, () -> MuiProtocolXmlParser.parse("test",
+                start + "<component src=\"slots.xml\" ordinal-offset=\"2147483647\"/></protocol>", resolver));
+        MuiResourceResolver invalidRoot = (owner, resource) -> new ByteArrayInputStream(range.getBytes(StandardCharsets.UTF_8));
+        assertThrows(MuiMarkupException.class, () -> MuiProtocolXmlParser.parse("test",
+                start + "<component src=\"slots.xml\"/></protocol>", invalidRoot));
+    }
+
+    @Test
     void protocolXmlIsCanonicalAndRejectsUnsafeOrUnknownSyntax() {
         String first = "<protocol id=\"test:screen\" schema-version=\"1\">"
                 + "<handler key=\"state\" id=\"4\" type=\"test:value\" version=\"1\"/>"
