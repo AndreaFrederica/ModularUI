@@ -144,6 +144,25 @@ function matchingRules(el) {
     if(internal.children.length>1)output.append(internal);
     if (!output.children.length) output.textContent='No matching stylesheet rules.';
 }
+function applyWidgetProjection(doc) {
+    // Java Widget.background(...) disables the theme drawable before painting the CSS drawable.
+    // Mark elements with a matching background declaration so browser UA/default visuals cannot
+    // remain visible around the CSS background.
+    const mark = new Set();
+    const visit = rules => {
+        for (const rule of rules) {
+            if (rule.cssRules) { try { visit(rule.cssRules); } catch { /* inaccessible CSSOM rule */ } }
+            if (!rule.selectorText || !rule.style) continue;
+            const hasBackground = [...rule.style].some(name => name === 'background' || name.startsWith('background-'));
+            if (!hasBackground) continue;
+            for (const el of doc.querySelectorAll('[data-mui-tag]')) {
+                try { if (el.matches(rule.selectorText)) mark.add(el); } catch { /* unsupported selector */ }
+            }
+        }
+    };
+    for (const sheet of doc.styleSheets) { try { visit(sheet.cssRules); } catch { /* no external stylesheets */ } }
+    for (const el of doc.querySelectorAll('[data-mui-tag]')) el.toggleAttribute('data-mui-css-background', mark.has(el));
+}
 function selectElement(el) {
     if (!el || !el.dataset?.muiTag) return;
     if (selectedElement) selectedElement.removeAttribute('data-dev-selected');
@@ -272,6 +291,7 @@ function rebuild() {
         const overlay=doc.createElement('div');overlay.id='dev-overlay';overlay.hidden=true;
         const tooltip=doc.createElement('div');tooltip.id='dev-tooltip';overlay.append(tooltip);
         doc.body.replaceChildren(root,overlay);
+        applyWidgetProjection(doc);
         doc.body.classList.toggle('inspect',pickMode);
         doc.body.classList.toggle('move-mode',moveMode);
         selectedElement = null;

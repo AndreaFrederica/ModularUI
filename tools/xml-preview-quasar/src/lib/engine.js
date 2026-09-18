@@ -105,10 +105,12 @@ export const baseStyle = `@layer mui-default {
 [data-mui-tag="mui:text"]{display:flex;align-items:center;white-space:pre-wrap}
 [data-mui-tag="mui:scroll"]{overflow:auto;pointer-events:auto}
 button:where([data-mui-tag]){-webkit-appearance:none;appearance:none;width:18px;height:18px;border:0;border-radius:0;padding:0;color:#fff;background:linear-gradient(#c6c6c6 0 1px,transparent 1px calc(100% - 1px),#3f3f3f calc(100% - 1px)),linear-gradient(90deg,#c6c6c6 0 1px,#858585 1px calc(100% - 1px),#3f3f3f calc(100% - 1px));box-shadow:none;text-shadow:1px 1px #3f3f3f;font:inherit;text-align:center;cursor:pointer;pointer-events:auto}
-button:where([data-mui-tag]):hover{background:linear-gradient(#eee 0 1px,transparent 1px calc(100% - 1px),#555 calc(100% - 1px)),linear-gradient(90deg,#eee 0 1px,#a0a0a0 1px calc(100% - 1px),#555 calc(100% - 1px))}button:where([data-mui-tag]):active{filter:brightness(.84);text-shadow:none}
+button:where([data-mui-tag]):hover{filter:brightness(1.12)}button:where([data-mui-tag]):active{filter:brightness(.84);text-shadow:none}
 :where(button[data-mui-tag][disabled]){color:#8b8b8b;filter:brightness(.72);text-shadow:none;cursor:default}
 :where(button[data-mui-tag][checked="true"]){background:#4b7866}
 input:where([data-mui-tag]){-webkit-appearance:none;appearance:none;margin:0;width:56px;height:18px;border:0;border-radius:0;padding:2px 3px;color:#fff;background:linear-gradient(#111 0 1px,transparent 1px calc(100% - 1px),#777 calc(100% - 1px)),linear-gradient(90deg,#111 0 1px,#202020 1px calc(100% - 1px),#777 calc(100% - 1px));box-shadow:none;font:inherit;pointer-events:auto}
+[data-mui-css-background]{box-shadow:none;border-radius:0}
+button[data-mui-css-background]:hover{filter:none}button[data-mui-css-background]:active{filter:none}
 button[data-mui-tag]:focus-visible,input:focus-visible{outline:2px solid #70d9c8;outline-offset:-2px}
  :where([data-mui-tag="mui:item-slot"]){width:18px;height:18px;background:#8b8b8b;border:1px solid #373737;box-shadow:inset 1px 1px #c6c6c6,inset -1px -1px #5b5b5b;pointer-events:auto;cursor:pointer;color:#fff;font:10px monospace;display:flex;align-items:center;justify-content:center}
 :where([data-mui-tag="mui:item-slot"]):hover{background:#a0a0a0;box-shadow:inset 0 0 0 1px #fff}
