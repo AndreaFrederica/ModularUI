@@ -188,8 +188,15 @@ public class ScrollArea extends Area {
         data.scrollTo(this, (int) (progress * (data.getScrollSize() - data.getFullVisibleSize(this) + data.getThickness())));
     }
 
+    /**
+     * Tests whether the given point lies on an active scrollbar.
+     * <p>
+     * The point must be in this scroll area's local coordinate space (0..w, 0..h), matching
+     * {@link ScrollData#isInsideScrollbarArea(ScrollArea, int, int)} and the coordinates used by
+     * {@link #mouseClicked(int, int)} and {@link #drag(int, int)}.
+     */
     public boolean isInsideScrollbarArea(int x, int y) {
-        if (!isInside(x, y)) {
+        if (x < 0 || y < 0 || x >= w() || y >= h()) {
             return false;
         }
         if (this.scrollX != null && this.scrollX.isInsideScrollbarArea(this, x, y)) {

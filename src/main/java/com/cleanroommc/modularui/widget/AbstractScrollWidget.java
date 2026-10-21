@@ -108,9 +108,20 @@ public abstract class AbstractScrollWidget<I extends IWidget, W extends Abstract
     public void getWidgetsAt(IViewportStack stack, HoveredWidgetList widgets, int x, int y) {
         // if 'widgets.peek() == this' is true, only then this widget is hovered
         // we should require this since a stencil is applied to this widget
-        if (widgets.peek() == this && !getScrollArea().isInsideScrollbarArea(x, y)) {
-            IViewport.super.getWidgetsAt(stack, widgets, x, y);
+        // x and y are absolute screen coordinates here, while the scrollbar occupies the scroll
+        // area's local space (0..w, 0..h) - the same space ScrollArea#mouseClicked uses after the
+        // widget transformation is applied. Converting here keeps the scrollbar hover area aligned
+        // with the area it is drawn over, no matter where the widget is positioned on the screen.
+        // The stack already contains the transformChildren() scroll offset, so remove it again to
+        // get back from content coordinates to the viewport coordinates the scrollbar lives in.
+        if (widgets.peek() == this) {
+            int localX = stack.unTransformX(x, y) - getScrollX();
+            int localY = stack.unTransformY(x, y) - getScrollY();
+            if (getScrollArea().isInsideScrollbarArea(localX, localY)) {
+                return;
+            }
         }
+        IViewport.super.getWidgetsAt(stack, widgets, x, y);
     }
 
     @Override
@@ -141,7 +152,12 @@ public abstract class AbstractScrollWidget<I extends IWidget, W extends Abstract
 
     @Override
     public boolean canHover() {
-        return super.canHover() || this.scroll.isInsideScrollbarArea(getContext().getMouseX(), getContext().getMouseY());
+        if (super.canHover()) return true;
+        // Hover collection runs with a reset context, so these are absolute screen coordinates.
+        // The scrollbar test expects coordinates local to this scroll area.
+        return this.scroll.isInsideScrollbarArea(
+                getContext().getAbsMouseX() - getArea().x(),
+                getContext().getAbsMouseY() - getArea().y());
     }
 
     @Override
